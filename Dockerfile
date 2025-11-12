@@ -98,4 +98,5 @@ COPY . /app
 WORKDIR /app
 
 # Command to run the application
-CMD ["python", "main.py"] 
+EXPOSE 8080
+CMD ["/usr/local/bin/python", "main.py"] 

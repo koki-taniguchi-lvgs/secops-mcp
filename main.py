@@ -24,7 +24,8 @@ from tools.arjun import arjun_wrapper, arjun_bulk_scan, arjun_with_custom_payloa
 
 # Create server
 mcp = FastMCP(name="secops-mcp",
-    version="1.0.0"
+    port=8080,
+    host="0.0.0.0"
 )
 
 
@@ -276,4 +277,4 @@ def arjun_custom_parameter_scan(
 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    mcp.run(transport="streamable-http")
