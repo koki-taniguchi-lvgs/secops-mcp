@@ -28,9 +28,10 @@ def run_subfinder(
             check=True
         )
         
-        # Parse the output
+        # Parse line-delimited JSON output
         try:
-            data = json.loads(result.stdout)
+            lines = [line for line in result.stdout.splitlines() if line.strip()]
+            data = [json.loads(line) for line in lines]
             return json.dumps({
                 "success": True,
                 "domain": domain,

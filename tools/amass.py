@@ -18,7 +18,7 @@ def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
         cmd = ["amass", "enum"]
         if passive:
             cmd.append("-passive")
-        cmd.extend(["-d", domain, "-json", "-"])
+        cmd.extend(["-d", domain])
         
         # Run the command
         result = subprocess.run(
@@ -28,21 +28,8 @@ def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
             check=True
         )
         
-        # Parse the output
-        subdomains = []
-        for line in result.stdout.splitlines():
-            if line.strip():
-                try:
-                    data = json.loads(line)
-                    subdomains.append({
-                        "name": data.get("name"),
-                        "domain": data.get("domain"),
-                        "addresses": data.get("addresses", []),
-                        "sources": data.get("sources", [])
-                    })
-                except json.JSONDecodeError:
-                    continue
-        
+        # Parse the output (plain text, each line is a subdomain)
+        subdomains = [line.strip() for line in result.stdout.splitlines() if line.strip()]
         return {
             "success": True,
             "subdomains": subdomains,

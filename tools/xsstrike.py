@@ -18,7 +18,12 @@ def run_xsstrike(
     """
     try:
         # Build the command
-        cmd = ["python3", "/opt/XSStrike/xsstrike.py", "-u", url]
+        import shutil
+        xsstrike_path = shutil.which("xsstrike")
+        if xsstrike_path:
+            cmd = [xsstrike_path, "-u", url]
+        else:
+            cmd = ["python3", "/opt/XSStrike/xsstrike.py", "-u", url]
         if options:
             cmd.extend(options)
         

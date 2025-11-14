@@ -23,7 +23,7 @@ def run_nuclei(
     """
     try:
         # Build the command
-        cmd = ["nuclei", "-u", target, "-json"]
+        cmd = ["nuclei", "-u", target, "-j"]
         
         # Add template filters if specified
         if templates:

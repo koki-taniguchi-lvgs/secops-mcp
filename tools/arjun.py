@@ -53,8 +53,8 @@ def arjun_wrapper(
         if delay > 0:
             cmd.extend(["--delay", str(delay)])
             
-        cmd.extend(["-t", str(timeout)])
-        cmd.extend(["--threads", str(threads)])
+        cmd.extend(["-T", str(timeout)])
+        cmd.extend(["-t", str(threads)])
         
         if stable:
             cmd.append("--stable")

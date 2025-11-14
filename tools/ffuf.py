@@ -16,35 +16,41 @@ def run_ffuf(
         filter_code: HTTP status code to filter out (e.g., "404")
     
     Returns:
-        str: JSON string containing fuzzing results
+        Dict[str, Any]: Dictionary containing fuzzing results
     """
     try:
-        # Build the command
-        cmd = ["ffuf", "-u", url, "-w", wordlist, "-fc", filter_code, "-o", "-", "-of", "json"]
-        
-        # Run the command
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        # Parse the output
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmpfile:
+            output_path = tmpfile.name
+        cmd = ["ffuf", "-w", wordlist, "-u", url, "-of", "json", "-o", output_path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
         try:
-            data = json.loads(result.stdout)
+            with open(output_path, "r") as f:
+                data = json.load(f)
+            os.remove(output_path)
+            findings = []
+            for entry in data.get("results", []):
+                findings.append({
+                    "status": entry.get("status"),
+                    "path": entry.get("input", {}).get("FUZZ"),
+                    "url": entry.get("url"),
+                    "length": entry.get("length"),
+                    "words": entry.get("words"),
+                    "lines": entry.get("lines")
+                })
             return json.dumps({
                 "success": True,
                 "url": url,
-                "results": data
+                "results": findings,
+                "total": len(findings)
             })
-        except json.JSONDecodeError:
+        except Exception as e:
             return json.dumps({
                 "success": False,
-                "error": "Failed to parse JSON output",
+                "error": f"Failed to parse ffuf JSON output: {str(e)}",
                 "raw_output": result.stdout
             })
-        
+
     except subprocess.CalledProcessError as e:
         return json.dumps({
             "success": False,
