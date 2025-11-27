@@ -1,4 +1,4 @@
-# 1. Use the original python:3.10-slim base image
+# 1. Use official Python slim image as base
 FROM python:3.10-slim
 
 # Set working directory
@@ -29,41 +29,41 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir -p /tools
 ENV PATH="/tools:${PATH}"
 
-# 4. Install Go-based tools from pre-compiled ARM64 binaries
+# 4. Install Go-based tools from pre-compiled amd64 binaries
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/nuclei/releases/download/v3.4.10/nuclei_3.4.10_linux_arm64.zip && \
-    unzip -q -o nuclei_3.4.10_linux_arm64.zip && mv nuclei /tools/ && \
-    rm -f nuclei_3.4.10_linux_arm64.zip
+    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/nuclei/releases/download/v3.4.10/nuclei_3.4.10_linux_amd64.zip && \
+    unzip -q -o nuclei_3.4.10_linux_amd64.zip && mv nuclei /tools/ && \
+    rm -f nuclei_3.4.10_linux_amd64.zip
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/ffuf/ffuf/releases/download/v2.1.0/ffuf_2.1.0_linux_arm64.tar.gz && \
-    tar -xzf ffuf_2.1.0_linux_arm64.tar.gz && mv ffuf /tools/ && \
-    rm -f ffuf_2.1.0_linux_arm64.tar.gz
+    wget -q --tries=3 --timeout=30 https://github.com/ffuf/ffuf/releases/download/v2.1.0/ffuf_2.1.0_linux_amd64.tar.gz && \
+    tar -xzf ffuf_2.1.0_linux_amd64.tar.gz && mv ffuf /tools/ && \
+    rm -f ffuf_2.1.0_linux_amd64.tar.gz
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/httpx/releases/download/v1.6.3/httpx_1.6.3_linux_arm64.zip && \
-    unzip -q -o httpx_1.6.3_linux_arm64.zip && mv httpx /tools/ && \
-    rm -f httpx_1.6.3_linux_arm64.zip
+    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/httpx/releases/download/v1.6.3/httpx_1.6.3_linux_amd64.zip && \
+    unzip -q -o httpx_1.6.3_linux_amd64.zip && mv httpx /tools/ && \
+    rm -f httpx_1.6.3_linux_amd64.zip
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/subfinder/releases/download/v2.9.0/subfinder_2.9.0_linux_arm64.zip && \
-    unzip -q -o subfinder_2.9.0_linux_arm64.zip && mv subfinder /tools/ && \
-    rm -f subfinder_2.9.0_linux_arm64.zip
+    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/subfinder/releases/download/v2.9.0/subfinder_2.9.0_linux_amd64.zip && \
+    unzip -q -o subfinder_2.9.0_linux_amd64.zip && mv subfinder /tools/ && \
+    rm -f subfinder_2.9.0_linux_amd64.zip
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/tlsx/releases/download/v1.2.1/tlsx_1.2.1_linux_arm64.zip && \
-    unzip -q -o tlsx_1.2.1_linux_arm64.zip && mv tlsx /tools/ && \
-    rm -f tlsx_1.2.1_linux_arm64.zip
+    wget -q --tries=3 --timeout=30 https://github.com/projectdiscovery/tlsx/releases/download/v1.2.1/tlsx_1.2.1_linux_amd64.zip && \
+    unzip -q -o tlsx_1.2.1_linux_amd64.zip && mv tlsx /tools/ && \
+    rm -f tlsx_1.2.1_linux_amd64.zip
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/jaeles-project/gospider/releases/download/v1.1.6/gospider_v1.1.6_linux_arm64.zip && \
-    unzip -q -o gospider_v1.1.6_linux_arm64.zip && mv gospider_v1.1.6_linux_arm64/gospider /tools/ && \
-    rm -f gospider_v1.1.6_linux_arm64.zip
+    wget -q --tries=3 --timeout=30 https://github.com/jaeles-project/gospider/releases/download/v1.1.6/gospider_v1.1.6_linux_amd64.zip && \
+    unzip -q -o gospider_v1.1.6_linux_amd64.zip && mv gospider_v1.1.6_linux_amd64/gospider /tools/ && \
+    rm -f gospider_v1.1.6_linux_amd64.zip
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/owasp-amass/amass/releases/download/v5.0.0/amass_linux_arm64.tar.gz && \
-    tar -xzf amass_linux_arm64.tar.gz && mv amass_linux_arm64/amass /tools/ && \
-    rm -f amass_linux_arm64.tar.gz
+    wget -q --tries=3 --timeout=30 https://github.com/owasp-amass/amass/releases/download/v5.0.0/amass_linux_amd64.tar.gz && \
+    tar -xzf amass_linux_amd64.tar.gz && mv amass_linux_amd64/amass /tools/ && \
+    rm -f amass_linux_amd64.tar.gz
 
 # 5. Install Python-based tools
 RUN git clone https://github.com/s0md3v/XSStrike.git /opt/XSStrike \
@@ -81,14 +81,11 @@ RUN mkdir -p /usr/share/wordlists/dirb \
     && ln -s /opt/dirsearch/dirsearch.py /usr/local/bin/dirsearch \
     && chmod +x /usr/local/bin/dirsearch
 
-# 7. FIX THE HASHCAT PATH
-#    This creates a "shortcut" (symlink) from the path the code wants
-#    to the path where the file actually is.
+# 7. Set up hashcat
 RUN mkdir -p /tools/hashcat && \
     ln -s /usr/bin/hashcat /tools/hashcat/hashcat.bin
 
-# 7. FIX THE ARJUN ERROR
-#    Arjun was never installed. This installs it via pip.
+# 8. Install Arjun
 RUN pip install arjun
 
 RUN pip install --no-cache-dir xsstrike \
@@ -100,17 +97,21 @@ RUN pip install --no-cache-dir xsstrike \
     paramiko \
     cryptography
 
-# 9. Copy requirements.txt (same as original)
+# 9. Copy requirements.txt 
 COPY requirements.txt .
 
-# 10. Install Python dependencies (same as original)
+# 10. Install Python dependencies 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 11. Copy project files (same as original)
+# 11. Copy project files 
 COPY . /app
 WORKDIR /app
 
-# 12. Set the correct CMD
-#     This fixes the 'stdio' vs. 'docker' runtime problem.
+# Ensure the MCP server starts correctly by setting the working directory and CMD
+WORKDIR /workspaces/secops-mcp
+
+# Expose port 8080 for external access
 EXPOSE 8080
+
+# Start the MCP server with full logging and fallback
 CMD ["python", "main.py"]

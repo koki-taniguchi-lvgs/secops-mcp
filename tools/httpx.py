@@ -19,11 +19,8 @@ def run_httpx(
         str: JSON string containing probe results
     """
     try:
-        # Detect if the first target is a file path
-        if not input_file and len(targets) == 1 and targets[0].endswith('.txt'):
-            input_file = targets[0]
-
         if input_file:
+            # Use file input
             cmd = ["httpx", "-json", "-l", input_file]
             if options:
                 cmd.extend(options)
@@ -34,7 +31,8 @@ def run_httpx(
                 check=True
             )
         else:
-            cmd = ["httpx", "-json", "-l", "-"]  # Use stdin for list input
+            # Use stdin for both single URLs and lists
+            cmd = ["httpx", "-json"]
             if options:
                 cmd.extend(options)
             result = subprocess.run(
