@@ -2,9 +2,21 @@ import random
 import subprocess
 import json
 from typing import List, Optional
+import signal
+import threading
+import logging
+import sys
 
 import requests
 from mcp.server.fastmcp import FastMCP
+
+# Configure logging to show subprocess output in docker logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 from tools.nuclei import run_nuclei
 from tools.ffuf import run_ffuf
@@ -17,15 +29,29 @@ from tools.subfinder import run_subfinder
 from tools.tlsx import run_tlsx
 from tools.xsstrike import run_xsstrike
 from tools.ipinfo import run_ipinfo
-from tools.amass import amass_wrapper
-from tools.dirsearch import dirsearch_wrapper
+from tools.amass import amass_wrapper as amass_tool
+from tools.dirsearch import dirsearch_wrapper as dirsearch_tool
 from tools.gospider import gospider_wrapper, gospider_crawl_with_filter
 from tools.arjun import arjun_wrapper, arjun_bulk_scan, arjun_with_custom_payloads
 
 # Create server
 mcp = FastMCP(name="secops-mcp",
-    version="1.0.0"
+    host="0.0.0.0",
+    port=8080,
+    log_level="INFO"
 )
+
+# Graceful shutdown flag
+graceful_shutdown = threading.Event()
+
+def handle_shutdown_signal(signum, frame):
+    """Handle shutdown signals to ensure proper cleanup."""
+    print("\nReceived shutdown signal. Cleaning up resources...")
+    graceful_shutdown.set()
+
+# Register signal handlers for graceful shutdown
+signal.signal(signal.SIGINT, handle_shutdown_signal)
+signal.signal(signal.SIGTERM, handle_shutdown_signal)
 
 
 @mcp.tool()
@@ -53,58 +79,83 @@ def ffuf_wrapper(
 def wfuzz_wrapper(
     url: str,
     wordlist: str,
-    filter_code: Optional[str] = "404",
+    hide_code: Optional[str] = "404",
 ) -> str:
     """Wrapper for running wfuzz fuzzing."""
-    return run_wfuzz(url, wordlist, filter_code)
+    result = run_wfuzz(url, wordlist, hide_code)
+    try:
+        if result:
+            data = json.loads(result)
+            return json.dumps({"success": True, "url": url, "results": data})
+        else:
+            return json.dumps({"success": False, "error": "No output from wfuzz", "raw_output": result})
+    except Exception:
+        return json.dumps({"success": False, "error": "Failed to parse JSON output", "raw_output": result})
 
 
 @mcp.tool()
 def sqlmap_wrapper(
     url: str,
-    risk: Optional[int] = 1,
-    level: Optional[int] = 1,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running SQLMap scan."""
-    return run_sqlmap(url, risk, level)
+    return run_sqlmap(url, options)
 
 
 @mcp.tool()
 def nmap_wrapper(
     target: str,
     ports: Optional[str] = None,
-    scan_type: Optional[str] = "sV",
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running Nmap scan."""
-    return run_nmap(target, ports, scan_type)
+    return run_nmap(target, ports, options)
 
 
 @mcp.tool()
 def hashcat_wrapper(
     hash_file: str,
     wordlist: str,
-    hash_type: str,
+    mode: int = 0,
 ) -> str:
     """Wrapper for running Hashcat password cracking."""
-    return run_hashcat(hash_file, wordlist, hash_type)
+    return run_hashcat(hash_file, wordlist, mode)
 
 
 @mcp.tool()
 def httpx_wrapper(
     urls: List[str],
-    status_codes: Optional[List[int]] = None,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running HTTPX scan."""
-    return run_httpx(urls, status_codes)
+    result = run_httpx(urls, options)
+    try:
+        # httpx may output multiple JSON objects per line
+        lines = result.splitlines()
+        parsed = []
+        for line in lines:
+            try:
+                parsed.append(json.loads(line))
+            except Exception:
+                continue
+        return json.dumps({"success": True, "urls": urls, "results": parsed})
+    except Exception:
+        return json.dumps({"success": False, "error": "Failed to parse JSON output", "raw_output": result})
 
 
 @mcp.tool()
 def subfinder_wrapper(
     domain: str,
-    recursive: bool = False,
+    output_format: Optional[str] = "json",
 ) -> str:
     """Wrapper for running Subfinder subdomain enumeration."""
-    return run_subfinder(domain, recursive)
+    result = run_subfinder(domain, output_format)
+    try:
+        # result is already a JSON string from run_subfinder
+        parsed = json.loads(result)
+        return json.dumps(parsed)
+    except Exception:
+        return json.dumps({"success": False, "error": "Failed to parse JSON output", "raw_output": result})
 
 
 @mcp.tool()
@@ -119,10 +170,10 @@ def tlsx_wrapper(
 @mcp.tool()
 def xsstrike_wrapper(
     url: str,
-    crawl: bool = False,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running XSStrike scan."""
-    return run_xsstrike(url, crawl)
+    return run_xsstrike(url, options)
 
 
 @mcp.tool()
@@ -134,12 +185,13 @@ def ipinfo_wrapper(
 
 
 @mcp.tool()
-def amass_wrapper(
+def amass_scan(
     domain: str,
     passive: bool = True,
 ) -> str:
     """Wrapper for running Amass subdomain enumeration."""
-    return amass_wrapper(domain, passive)
+    result = amass_tool(domain, passive)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()
@@ -149,7 +201,8 @@ def dirsearch_wrapper(
     wordlist: Optional[str] = None,
 ) -> str:
     """Wrapper for running Dirsearch directory brute forcing."""
-    return dirsearch_wrapper(url, extensions, wordlist)
+    result = dirsearch_tool(url, extensions, wordlist)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()
@@ -276,4 +329,13 @@ def arjun_custom_parameter_scan(
 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    try:
+        print("Starting MCP server...")
+        mcp.run(transport="streamable-http")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+    finally:
+        if graceful_shutdown.is_set():
+            print("Server shutting down gracefully.")
+        else:
+            print("Server stopped unexpectedly.")

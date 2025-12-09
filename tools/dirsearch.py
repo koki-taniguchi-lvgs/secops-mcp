@@ -16,14 +16,12 @@ def dirsearch_wrapper(url: str, extensions: Optional[List[str]] = None, wordlist
     """
     try:
         # Build the command
-        cmd = ["dirsearch", "-u", url, "--json-report", "-"]
-        
+        cmd = ["dirsearch", "-u", url]
         if extensions:
             cmd.extend(["-e", ",".join(extensions)])
-        
         if wordlist:
             cmd.extend(["-w", wordlist])
-        
+
         # Run the command
         result = subprocess.run(
             cmd,
@@ -31,30 +29,40 @@ def dirsearch_wrapper(url: str, extensions: Optional[List[str]] = None, wordlist
             text=True,
             check=True
         )
-        
+
         # Parse the output
-        try:
-            data = json.loads(result.stdout)
-            return {
-                "success": True,
-                "results": data.get("results", []),
-                "total": len(data.get("results", []))
-            }
-        except json.JSONDecodeError:
-            return {
-                "success": False,
-                "error": "Failed to parse JSON output",
-                "raw_output": result.stdout
-            }
-        
+        findings = []
+        lines = result.stdout.splitlines()
+        for line in lines:
+            # Look for lines like: [05:59:50] 200 -    19B - /cd/recursion/admin/users/96
+            if "]" in line and " - " in line:
+                parts = line.split(" - ")
+                if len(parts) >= 3:
+                    status_part = parts[0]
+                    status_code = None
+                    try:
+                        status_code = int(status_part.split("]")[-1].strip())
+                    except ValueError:
+                        continue
+                    path = parts[2].strip()
+                    findings.append({
+                        "status": status_code,
+                        "path": path
+                    })
+        return json.dumps({
+            "success": True,
+            "results": findings,
+            "total": len(findings)
+        })
+
     except subprocess.CalledProcessError as e:
-        return {
+        return json.dumps({
             "success": False,
             "error": str(e),
             "stderr": e.stderr
-        }
+        })
     except Exception as e:
-        return {
+        return json.dumps({
             "success": False,
             "error": str(e)
-        } 
+        })

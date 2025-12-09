@@ -1,6 +1,16 @@
 import subprocess
 import json
 from typing import Optional, Dict, Any
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 
 def run_subfinder(
@@ -20,6 +30,9 @@ def run_subfinder(
         # Build the command
         cmd = ["subfinder", "-d", domain, "-json"]
         
+        logger.info(f"[subfinder] Executing command: {' '.join(cmd)}")
+        logger.info(f"[subfinder] Domain: {domain}")
+        
         # Run the command
         result = subprocess.run(
             cmd,
@@ -28,9 +41,15 @@ def run_subfinder(
             check=True
         )
         
-        # Parse the output
+        logger.info(f"[subfinder] Command completed successfully")
+        logger.info(f"[subfinder] Output lines: {len(result.stdout.splitlines())}")
+        if result.stderr:
+            logger.info(f"[subfinder] stderr: {result.stderr}")
+        
+        # Parse line-delimited JSON output
         try:
-            data = json.loads(result.stdout)
+            lines = [line for line in result.stdout.splitlines() if line.strip()]
+            data = [json.loads(line) for line in lines]
             return json.dumps({
                 "success": True,
                 "domain": domain,
@@ -44,12 +63,15 @@ def run_subfinder(
             })
         
     except subprocess.CalledProcessError as e:
+        logger.error(f"[subfinder] Command failed with return code {e.returncode}")
+        logger.error(f"[subfinder] stderr: {e.stderr}")
         return json.dumps({
             "success": False,
             "error": str(e),
             "stderr": e.stderr
         })
     except Exception as e:
+        logger.error(f"[subfinder] Exception: {str(e)}")
         return json.dumps({
             "success": False,
             "error": str(e)

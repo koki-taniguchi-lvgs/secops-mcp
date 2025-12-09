@@ -7,21 +7,30 @@ def run_sqlmap(
     url: str,
     options: Optional[List[str]] = None,
 ) -> str:
-    """Run sqlmap to test for SQL injection vulnerabilities.
-    
+    """
+    Run sqlmap to test for SQL injection vulnerabilities.
+
     Args:
-        url: Target URL to scan
+        url: Target URL to scan (should include a parameter, e.g., 'http://testphp.vulnweb.com/listproducts.php?cat=1')
         options: Additional sqlmap options (e.g., ["--dbs", "--batch"])
-    
+
     Returns:
         str: JSON string containing scan results
     """
     try:
+        # Check if URL contains a parameter
+        if '?' not in url or '=' not in url:
+            return json.dumps({
+                "success": False,
+                "error": "URL must include a parameter (e.g., '?id=1').",
+                "usage": "Example: http://testphp.vulnweb.com/listproducts.php?cat=1"
+            })
+
         # Build the command
         cmd = ["sqlmap", "-u", url, "--batch", "--output-dir=/tmp/sqlmap"]
         if options:
             cmd.extend(options)
-        
+
         # Run the command
         result = subprocess.run(
             cmd,
@@ -29,7 +38,7 @@ def run_sqlmap(
             text=True,
             check=True
         )
-        
+
         # Parse the output
         return json.dumps({
             "success": True,
