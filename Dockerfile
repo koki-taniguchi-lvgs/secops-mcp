@@ -56,9 +56,9 @@ RUN cd /tmp && \
     rm -f tlsx_1.2.1_linux_amd64.zip
 
 RUN cd /tmp && \
-    wget -q --tries=3 --timeout=30 https://github.com/jaeles-project/gospider/releases/download/v1.1.6/gospider_v1.1.6_linux_amd64.zip && \
-    unzip -q -o gospider_v1.1.6_linux_amd64.zip && mv gospider_v1.1.6_linux_amd64/gospider /tools/ && \
-    rm -f gospider_v1.1.6_linux_amd64.zip
+    wget -q --tries=3 --timeout=30 https://github.com/jaeles-project/gospider/releases/download/v1.1.6/gospider_v1.1.6_linux_x86_64.zip && \
+    unzip -q -o gospider_v1.1.6_linux_x86_64.zip && mv gospider_v1.1.6_linux_x86_64/gospider /tools/ && \
+    rm -f gospider_v1.1.6_linux_x86_64.zip
 
 RUN cd /tmp && \
     wget -q --tries=3 --timeout=30 https://github.com/owasp-amass/amass/releases/download/v5.0.0/amass_linux_amd64.tar.gz && \
@@ -104,14 +104,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 11. Copy project files 
-COPY . /app
-WORKDIR /app
-
-# Ensure the MCP server starts correctly by setting the working directory and CMD
-WORKDIR /workspaces/secops-mcp
-
-# Expose port 8080 for external access
-EXPOSE 8080
+COPY . .
 
 # Start the MCP server with full logging and fallback
 CMD ["python", "main.py"]
+
+# Expose port 8081 for external access
+EXPOSE 8080
+ENV PORT=8080

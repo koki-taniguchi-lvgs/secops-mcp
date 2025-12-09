@@ -40,6 +40,7 @@ coverage.xml
 .vscode/
 *.swp
 *.swo
+.devcontainer/
 
 # OS specific files
 .DS_Store
@@ -63,6 +64,7 @@ config/
 *.db-journal
 *.db-wal
 *.db-shm
+.gcloudignore
 
 # Tool specific
 nuclei-templates/

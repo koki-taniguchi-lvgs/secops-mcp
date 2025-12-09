@@ -2,9 +2,21 @@ import random
 import subprocess
 import json
 from typing import List, Optional
+import signal
+import threading
+import logging
+import sys
 
 import requests
 from mcp.server.fastmcp import FastMCP
+
+# Configure logging to show subprocess output in docker logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 from tools.nuclei import run_nuclei
 from tools.ffuf import run_ffuf
@@ -28,6 +40,18 @@ mcp = FastMCP(name="secops-mcp",
     port=8080,
     log_level="INFO"
 )
+
+# Graceful shutdown flag
+graceful_shutdown = threading.Event()
+
+def handle_shutdown_signal(signum, frame):
+    """Handle shutdown signals to ensure proper cleanup."""
+    print("\nReceived shutdown signal. Cleaning up resources...")
+    graceful_shutdown.set()
+
+# Register signal handlers for graceful shutdown
+signal.signal(signal.SIGINT, handle_shutdown_signal)
+signal.signal(signal.SIGTERM, handle_shutdown_signal)
 
 
 @mcp.tool()
@@ -305,4 +329,13 @@ def arjun_custom_parameter_scan(
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    try:
+        print("Starting MCP server...")
+        mcp.run(transport="streamable-http")
+    except Exception as e:
+        print(f"Error occurred: {e}")
+    finally:
+        if graceful_shutdown.is_set():
+            print("Server shutting down gracefully.")
+        else:
+            print("Server stopped unexpectedly.")
