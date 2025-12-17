@@ -37,7 +37,7 @@ from tools.arjun import arjun_wrapper, arjun_bulk_scan, arjun_with_custom_payloa
 # Create server
 mcp = FastMCP(name="secops-mcp",
     host="0.0.0.0",
-    port=8080,
+    port=8081,
     log_level="INFO"
 )
 

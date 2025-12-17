@@ -110,5 +110,5 @@ COPY . .
 CMD ["python", "main.py"]
 
 # Expose port 8081 for external access
-EXPOSE 8080
-ENV PORT=8080
+EXPOSE 8081
+ENV PORT=8081
