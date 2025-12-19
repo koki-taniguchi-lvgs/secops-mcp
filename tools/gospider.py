@@ -32,13 +32,12 @@ def gospider_wrapper(
         Dict[str, Any]: Results containing discovered URLs and related information
     """
     try:
-                # Validate that target includes http:// or https://
-                if not target.startswith(
-                    "http://") and not target.startswith("https://"):
-                    return {
-                        "success": False,
-                        "error": "Target URL must include http:// or https:// scheme"
-                    }
+        # Validate that target includes http:// or https://
+        if not target.startswith("http://") and not target.startswith("https://"):
+            return {
+                "success": False,
+                "error": "Target URL must include http:// or https:// scheme"
+            }
 
         # Build the command
         cmd = ["gospider", "-s", target]
