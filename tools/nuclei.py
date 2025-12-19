@@ -41,20 +41,34 @@ def run_nuclei(
             check=True
         )
         
-        # Parse the output
-        try:
-            data = json.loads(result.stdout)
-            return json.dumps({
-                "success": True,
-                "target": target,
-                "results": data
-            })
-        except json.JSONDecodeError:
-            return json.dumps({
-                "success": False,
-                "error": "Failed to parse JSON output",
-                "raw_output": result.stdout
-            })
+        # Parse the output - Nuclei outputs JSONL (one JSON per line)
+        # Filter out warning messages and other non-JSON lines
+        findings = []
+        warnings = []
+        
+        if result.stdout.strip():
+            for line in result.stdout.strip().split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+                # Only parse lines that start with { (valid JSON objects)
+                if line.startswith('{'):
+                    try:
+                        findings.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        # Skip lines that look like JSON but aren't valid
+                        continue
+                else:
+                    # Collect warning/info messages
+                    warnings.append(line)
+        
+        return json.dumps({
+            "success": True,
+            "target": target,
+            "findings_count": len(findings),
+            "findings": findings,
+            "warnings": warnings if warnings else None
+        }, indent=2)
         
     except subprocess.CalledProcessError as e:
         return json.dumps({
