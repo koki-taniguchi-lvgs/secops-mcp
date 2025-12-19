@@ -2,9 +2,10 @@ import subprocess
 import json
 from typing import Optional, Dict, Any, List
 
+
 def gospider_wrapper(
-    target: str, 
-    depth: int = 3, 
+    target: str,
+    depth: int = 3,
     concurrent: int = 10,
     timeout: int = 10,
     user_agent: Optional[str] = None,
@@ -15,7 +16,7 @@ def gospider_wrapper(
 ) -> Dict[str, Any]:
     """
     Wrapper for Gospider web crawling tool.
-    
+
     Args:
         target (str): Target URL or domain to crawl
         depth (int): Maximum crawling depth (default: 3)
@@ -26,18 +27,19 @@ def gospider_wrapper(
         include_subs (bool): Include subdomains in crawling
         include_other_source (bool): Include other sources like robots.txt, sitemap.xml
         output_format (str): Output format (json, txt)
-    
+
     Returns:
         Dict[str, Any]: Results containing discovered URLs and related information
     """
     try:
                 # Validate that target includes http:// or https://
-                if not target.startswith("http://") and not target.startswith("https://"):
+                if not target.startswith(
+                    "http://") and not target.startswith("https://"):
                     return {
                         "success": False,
                         "error": "Target URL must include http:// or https:// scheme"
                     }
-        
+
         # Build the command
         cmd = ["gospider", "-s", target]
         
