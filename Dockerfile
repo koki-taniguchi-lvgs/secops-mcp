@@ -108,7 +108,3 @@ COPY . .
 
 # Start the MCP server with full logging and fallback
 CMD ["python", "main.py"]
-
-# Expose port 8081 for external access
-EXPOSE 8081
-ENV PORT=8081

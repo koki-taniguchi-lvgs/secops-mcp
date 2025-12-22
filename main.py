@@ -1,5 +1,3 @@
-import random
-import subprocess
 import json
 from typing import List, Optional
 import signal
@@ -7,7 +5,7 @@ import threading
 import logging
 import sys
 
-import requests
+import os
 from mcp.server.fastmcp import FastMCP
 
 # Configure logging to show subprocess output in docker logs
@@ -37,7 +35,7 @@ from tools.arjun import arjun_wrapper, arjun_bulk_scan, arjun_with_custom_payloa
 # Create server
 mcp = FastMCP(name="secops-mcp",
     host="0.0.0.0",
-    port=8081,
+    port=int(os.environ.get("PORT", 8080)),
     log_level="INFO"
 )
 
