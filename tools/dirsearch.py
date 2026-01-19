@@ -49,10 +49,23 @@ def dirsearch_wrapper(url: str, extensions: Optional[List[str]] = None, wordlist
                         "status": status_code,
                         "path": path
                     })
+        
+        # Save all findings
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/dirsearch_latest.json", "w") as f:
+            json.dump(findings, f)
+
+        # Return a summary
+        limit = 100
+        summary = findings[:limit]
+
         return json.dumps({
             "success": True,
-            "results": findings,
-            "total": len(findings)
+            "results_summary": summary,
+            "total": len(findings),
+            "is_truncated": len(findings) > limit,
+            "note": "Use fetch_dirsearch_results() for the full list."
         })
 
     except subprocess.CalledProcessError as e:

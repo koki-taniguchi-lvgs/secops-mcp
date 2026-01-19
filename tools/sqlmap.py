@@ -39,14 +39,26 @@ def run_sqlmap(
             check=True
         )
 
-        # Parse the output
+        # Save the full output to a file
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/sqlmap_latest.log", "w") as f:
+            f.write(result.stdout)
+
+        # Parse the output for a summary
+        # Look for "vulnerable" or "Payload:" in the last 5000 chars
+        summary_log = result.stdout[-2000:]
+        if "is vulnerable" in result.stdout:
+            # Try to find the vulnerability details
+            vuln_start = result.stdout.find("is vulnerable")
+            summary_log = result.stdout[vuln_start-100:vuln_start+1000]
+
         return json.dumps({
             "success": True,
             "url": url,
-            "results": {
-                "output": result.stdout,
-                "options": options or []
-            }
+            "is_vulnerable": "is vulnerable" in result.stdout,
+            "summary_log": summary_log,
+            "note": "Use fetch_sqlmap_output() to see the full log including HTTP traffic."
         })
         
     except subprocess.CalledProcessError as e:

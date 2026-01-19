@@ -34,15 +34,19 @@ def run_xsstrike(
             text=True,
             check=True
         )
+
+        # Save all results
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/xsstrike_latest.log", "w") as f:
+            f.write(result.stdout)
         
         # Parse the output
         return json.dumps({
             "success": True,
             "url": url,
-            "results": {
-                "output": result.stdout,
-                "options": options or []
-            }
+            "summary_log": result.stdout[-2000:],
+            "note": "Use fetch_stored_results('xsstrike') for the full log."
         })
         
     except subprocess.CalledProcessError as e:

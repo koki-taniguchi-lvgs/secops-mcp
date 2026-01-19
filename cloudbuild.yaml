@@ -1,0 +1,8 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/ai-agent-poc-458604/pt-agent-poc/secops-mcp:latest', '.']
+images:
+- 'us-central1-docker.pkg.dev/ai-agent-poc-458604/pt-agent-poc/secops-mcp:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
+serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/gen-ai-poc-deployer-infra@ai-agent-poc-458604.iam.gserviceaccount.com'

@@ -50,10 +50,24 @@ def run_subfinder(
         try:
             lines = [line for line in result.stdout.splitlines() if line.strip()]
             data = [json.loads(line) for line in lines]
+            
+            # Save all results to storage
+            import os
+            os.makedirs("/tmp/secops_results", exist_ok=True)
+            with open("/tmp/secops_results/subfinder_latest.json", "w") as f:
+                json.dump(data, f)
+
+            # Return a summary to avoid context overflow
+            limit = 100
+            summary_data = data[:limit]
+            
             return json.dumps({
                 "success": True,
                 "domain": domain,
-                "results": data
+                "summary": summary_data,
+                "total_found": len(data),
+                "is_truncated": len(data) > limit,
+                "note": "Use fetch_all_subdomains() if you need the full list."
             })
         except json.JSONDecodeError:
             return json.dumps({

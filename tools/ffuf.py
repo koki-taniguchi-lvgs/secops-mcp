@@ -38,11 +38,23 @@ def run_ffuf(
                     "words": entry.get("words"),
                     "lines": entry.get("lines")
                 })
+            # Save all results
+            import os
+            os.makedirs("/tmp/secops_results", exist_ok=True)
+            with open("/tmp/secops_results/ffuf_latest.json", "w") as f:
+                json.dump(data.get("results", []), f)
+
+            # Return a summary
+            limit = 100
+            summary = findings[:limit]
+
             return json.dumps({
                 "success": True,
                 "url": url,
-                "results": findings,
-                "total": len(findings)
+                "summary": summary,
+                "total": len(findings),
+                "is_truncated": len(findings) > limit,
+                "note": "Use fetch_stored_results('ffuf') for the full list."
             })
         except Exception as e:
             return json.dumps({

@@ -31,11 +31,12 @@ from tools.amass import amass_wrapper as amass_tool
 from tools.dirsearch import dirsearch_wrapper as dirsearch_tool
 from tools.gospider import gospider_wrapper, gospider_crawl_with_filter
 from tools.arjun import arjun_wrapper, arjun_bulk_scan, arjun_with_custom_payloads
+from tools.curl import run_curl
 
 # Create server
 mcp = FastMCP(name="secops-mcp",
     host="0.0.0.0",
-    port=int(os.environ.get("PORT", 8080)),
+    port=int(os.environ.get("PORT", 8081)),
     log_level="INFO"
 )
 
@@ -61,6 +62,71 @@ def nuclei_scan_wrapper(
 ) -> str:
     """Wrapper for running a Nuclei security scan."""
     return run_nuclei(target, templates, severity, output_format)
+
+
+@mcp.tool()
+def fetch_nuclei_finding_detail(finding_id: int) -> str:
+    """
+    Fetch the full details of a specific Nuclei finding, including request and response.
+    The finding_id is the index provided in the nuclei_scan_wrapper summary.
+    """
+    try:
+        path = "/tmp/secops_results/nuclei_full.json"
+        if not os.path.exists(path):
+            return json.dumps({"success": False, "error": "No nuclei scan results found. Run a scan first."})
+        
+        with open(path, "r") as f:
+            full_findings = json.load(f)
+        
+        if 0 <= finding_id < len(full_findings):
+            return json.dumps({
+                "success": True,
+                "finding": full_findings[finding_id]
+            }, indent=2)
+        else:
+            return json.dumps({"success": False, "error": f"Finding ID {finding_id} out of range (0-{len(full_findings)-1})"})
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def fetch_stored_results(tool_name: str) -> str:
+    """
+    Fetch the full results of a previously run tool (subfinder, amass, gospider, dirsearch).
+    Results are returned in full, so use with caution if you expect massive output.
+    """
+    try:
+        mapping = {
+            "subfinder": "/tmp/secops_results/subfinder_latest.json",
+            "amass": "/tmp/secops_results/amass_latest.json",
+            "gospider": "/tmp/secops_results/gospider_latest.json",
+            "dirsearch": "/tmp/secops_results/dirsearch_latest.json",
+            "sqlmap": "/tmp/secops_results/sqlmap_latest.log",
+            "httpx": "/tmp/secops_results/httpx_latest.json",
+            "ffuf": "/tmp/secops_results/ffuf_latest.json",
+            "wfuzz": "/tmp/secops_results/wfuzz_latest.json",
+            "xsstrike": "/tmp/secops_results/xsstrike_latest.log",
+            "nmap": "/tmp/secops_results/nmap_raw.xml"
+        }
+        
+        if tool_name not in mapping:
+            return json.dumps({"success": False, "error": f"Unknown tool or no storage configured for {tool_name}"})
+        
+        path = mapping[tool_name]
+        if not os.path.exists(path):
+            return json.dumps({"success": False, "error": f"No stored results found for {tool_name}. Run the scan first."})
+        
+        if path.endswith(".json"):
+            with open(path, "r") as f:
+                data = json.load(f)
+            return json.dumps({"success": True, "results": data}, indent=2)
+        else:
+            with open(path, "r") as f:
+                data = f.read()
+            return json.dumps({"success": True, "output": data})
+            
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
@@ -324,6 +390,20 @@ def arjun_custom_parameter_scan(
         stable=stable
     )
     return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def curl_tool(
+    url: str,
+    options: Optional[List[str]] = None,
+) -> str:
+    """Wrapper for running curl commands to transfer data.
+    
+    Args:
+        url: The URL to interact with
+        options: Additional curl options (e.g., ["-X", "POST", "-d", "data"])
+    """
+    return run_curl(url, options)
 
 
 if __name__ == "__main__":

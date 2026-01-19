@@ -55,15 +55,54 @@ def run_nmap(
         if result.stderr:
             logger.info(f"[nmap] stderr: {result.stderr}")
 
+        # Save raw XML to storage
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/nmap_raw.xml", "w") as f:
+            f.write(result.stdout)
+
         # Parse the output
+        import xml.etree.ElementTree as ET
+        parsed_hosts = []
+        try:
+            root = ET.fromstring(result.stdout)
+            for host in root.findall('host'):
+                ip = host.find('address').attrib.get('addr')
+                hostnames = [hn.attrib.get('name') for hn in host.findall('.//hostname')]
+                ports = []
+                for port in host.findall('.//port'):
+                    port_id = port.attrib.get('portid')
+                    protocol = port.attrib.get('protocol')
+                    state = port.find('state').attrib.get('state')
+                    service_node = port.find('service')
+                    service_name = service_node.attrib.get('name') if service_node is not None else "unknown"
+                    if state == "open":
+                        ports.append({
+                            "port": port_id,
+                            "protocol": protocol,
+                            "state": state,
+                            "service": service_name
+                        })
+                parsed_hosts.append({
+                    "ip": ip,
+                    "hostnames": hostnames,
+                    "open_ports": ports
+                })
+        except Exception as pe:
+            logger.error(f"[nmap] Failed to parse XML: {pe}")
+            # Fallback to a snippet of stdout if parsing fails
+            return json.dumps({
+                "success": True,
+                "target": target,
+                "warning": f"XML parsing failed: {str(pe)}",
+                "raw_snippet": result.stdout[:2000]
+            })
+
         return json.dumps({
             "success": True,
             "target": target,
             "ports": ports if ports else "top-1000",
-            "results": {
-                "xml_output": result.stdout,
-                "options": options or []
-            }
+            "results": parsed_hosts
         })
 
     except subprocess.CalledProcessError as e:

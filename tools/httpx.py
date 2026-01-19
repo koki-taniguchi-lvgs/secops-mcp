@@ -43,19 +43,36 @@ def run_httpx(
                 check=True
             )
         
-        # Parse the output
+        # Parse the output (line-delimited JSON)
         try:
-            data = json.loads(result.stdout)
+            results = []
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    results.append(json.loads(line))
+            
+            # Save all results
+            import os
+            os.makedirs("/tmp/secops_results", exist_ok=True)
+            with open("/tmp/secops_results/httpx_latest.json", "w") as f:
+                json.dump(results, f)
+
+            # Return a summary
+            limit = 100
+            summary = results[:limit]
+
             return json.dumps({
                 "success": True,
                 "targets": targets,
-                "results": data
+                "summary": summary,
+                "total_count": len(results),
+                "is_truncated": len(results) > limit,
+                "note": "Use fetch_stored_results('httpx') for the full list."
             })
-        except json.JSONDecodeError:
+        except Exception as e:
             return json.dumps({
                 "success": False,
-                "error": "Failed to parse JSON output",
-                "raw_output": result.stdout
+                "error": f"Failed to parse JSON output: {str(e)}",
+                "raw_output": result.stdout[:1000]
             })
         
     except subprocess.CalledProcessError as e:

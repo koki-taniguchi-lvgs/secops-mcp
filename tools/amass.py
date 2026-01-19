@@ -30,10 +30,23 @@ def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
         
         # Parse the output (plain text, each line is a subdomain)
         subdomains = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        
+        # Save all results
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/amass_latest.json", "w") as f:
+            json.dump(subdomains, f)
+            
+        # Return a summary
+        limit = 100
+        summary = subdomains[:limit]
+            
         return {
             "success": True,
-            "subdomains": subdomains,
-            "count": len(subdomains)
+            "subdomains_summary": summary,
+            "total_count": len(subdomains),
+            "is_truncated": len(subdomains) > limit,
+            "note": "Use fetch_all_subdomains() if you need the full list."
         }
         
     except subprocess.CalledProcessError as e:

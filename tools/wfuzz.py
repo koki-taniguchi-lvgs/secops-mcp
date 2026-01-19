@@ -43,11 +43,23 @@ def run_wfuzz(
                     "payload": match.group(2),
                     "url": match.group(3)
                 })
+        # Save all results
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/wfuzz_latest.json", "w") as f:
+            json.dump(findings, f)
+
+        # Return a summary
+        limit = 100
+        summary = findings[:limit]
+
         return json.dumps({
             "success": True,
             "url": url,
-            "results": findings,
-            "total": len(findings)
+            "summary": summary,
+            "total": len(findings),
+            "is_truncated": len(findings) > limit,
+            "note": "Use fetch_stored_results('wfuzz') for the full list."
         })
 
     except subprocess.CalledProcessError as e:

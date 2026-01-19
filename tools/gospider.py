@@ -115,17 +115,34 @@ def gospider_wrapper(
                         "status": None
                     })
         
+        # Save all results
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        all_results = {
+            "urls": urls,
+            "forms": forms,
+            "secrets": secrets
+        }
+        with open("/tmp/secops_results/gospider_latest.json", "w") as f:
+            json.dump(all_results, f)
+
+        # Return a summary
+        limit = 50
         return {
             "success": True,
             "target": target,
-            "urls": urls,
-            "forms": forms,
-            "secrets": secrets,
+            "summary": {
+                "urls": urls[:limit],
+                "forms": forms[:limit],
+                "secrets": secrets[:limit]
+            },
             "stats": {
                 "total_urls": len(urls),
                 "total_forms": len(forms),
                 "total_secrets": len(secrets)
-            }
+            },
+            "is_truncated": len(urls) > limit or len(forms) > limit or len(secrets) > limit,
+            "note": "Use fetch_gospider_results() for the full list."
         }
         
     except subprocess.CalledProcessError as e:
