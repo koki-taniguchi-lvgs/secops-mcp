@@ -63,57 +63,74 @@ def gospider_wrapper(
         if output_format == "json":
             cmd.append("--json")
         
-        # Run the command
-        result = subprocess.run(
+        # Run the command with streaming output
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=True
+            bufsize=1
         )
         
         # Parse the output
         urls = []
         forms = []
         secrets = []
+        other = []
         
-        if output_format == "json":
-            for line in result.stdout.splitlines():
-                if line.strip():
+        if process.stdout:
+            for line in process.stdout:
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                
+                if output_format == "json":
                     try:
-                        data = json.loads(line)
-                        
+                        data = json.loads(clean_line)
                         if data.get("type") == "url":
-                            urls.append({
+                            url_info = {
                                 "url": data.get("output"),
                                 "source": data.get("source"),
                                 "tag": data.get("tag"),
                                 "status": data.get("status_code")
-                            })
+                            }
+                            urls.append(url_info)
+                            print(f"🕸️ [gospider] URL Found: {url_info['url']} ({url_info.get('status')})", flush=True)
                         elif data.get("type") == "form":
-                            forms.append({
+                            form_info = {
                                 "url": data.get("output"),
                                 "source": data.get("source"),
                                 "tag": data.get("tag")
-                            })
+                            }
+                            forms.append(form_info)
+                            print(f"📝 [gospider] Form Found: {form_info['url']}", flush=True)
                         elif data.get("type") == "secret":
-                            secrets.append({
+                            secret_info = {
                                 "secret": data.get("output"),
                                 "source": data.get("source"),
                                 "tag": data.get("tag")
-                            })
-                            
+                            }
+                            secrets.append(secret_info)
+                            print(f"🔑 [gospider] Secret Found: {secret_info['tag']}", flush=True)
+                        else:
+                            other.append(data)
                     except json.JSONDecodeError:
                         continue
-        else:
-            # Parse plain text output
-            for line in result.stdout.splitlines():
-                if line.strip() and line.startswith("http"):
-                    urls.append({
-                        "url": line.strip(),
-                        "source": "crawl",
-                        "tag": "url",
-                        "status": None
-                    })
+                else:
+                    # Text format: [url] - http://...
+                    if " - " in clean_line:
+                        print(f"🕸️ [gospider] {clean_line}", flush=True)
+                    other.append(clean_line)
+
+        _, stderr = process.communicate()
+        return_code = process.wait()
+        
+        if return_code != 0:
+            return {
+                "success": False,
+                "error": f"Command returned non-zero exit code {return_code}",
+                "stderr": stderr
+            }
         
         # Save all results
         import os
@@ -121,7 +138,8 @@ def gospider_wrapper(
         all_results = {
             "urls": urls,
             "forms": forms,
-            "secrets": secrets
+            "secrets": secrets,
+            "other": other
         }
         with open("/tmp/secops_results/gospider_latest.json", "w") as f:
             json.dump(all_results, f)
@@ -145,12 +163,6 @@ def gospider_wrapper(
             "note": "Use fetch_gospider_results() for the full list."
         }
         
-    except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "stderr": e.stderr if e.stderr else "Command execution failed"
-        }
     except Exception as e:
         return {
             "success": False,

@@ -40,32 +40,58 @@ def run_nmap(
         cmd.extend(["-oX", "-", target])
 
         logger.info(f"[nmap] Executing command: {' '.join(cmd)}")
-        logger.info(f"[nmap] Target: {target}")
-
-        # Run the command
-        result = subprocess.run(
+        
+        # Run the command with streaming output
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            check=True
+            bufsize=1
         )
 
+        full_output = []
+        xml_lines = []
+        if process.stdout:
+            for line in process.stdout:
+                full_output.append(line)
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                
+                # Nmap XML output lines usually start with <
+                if clean_line.startswith("<"):
+                    xml_lines.append(line)
+                else:
+                    # Print progress and other info
+                    print(f"📊 [nmap] {clean_line}", flush=True)
+
+        process.wait()
+        return_code = process.returncode
+        
+        if return_code != 0:
+            logger.error(f"[nmap] Command failed with return code {return_code}")
+            return json.dumps({
+                "success": False,
+                "error": f"Command failed with return code {return_code}",
+                "stdout": "".join(full_output)
+            })
+
+        xml_content = "".join(xml_lines)
         logger.info(f"[nmap] Command completed successfully")
-        logger.info(f"[nmap] Output length: {len(result.stdout)} bytes")
-        if result.stderr:
-            logger.info(f"[nmap] stderr: {result.stderr}")
+        logger.info(f"[nmap] XML output length: {len(xml_content)} bytes")
 
         # Save raw XML to storage
         import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/nmap_raw.xml", "w") as f:
-            f.write(result.stdout)
+            f.write(xml_content)
 
         # Parse the output
         import xml.etree.ElementTree as ET
         parsed_hosts = []
         try:
-            root = ET.fromstring(result.stdout)
+            root = ET.fromstring(xml_content)
             for host in root.findall('host'):
                 ip = host.find('address').attrib.get('addr')
                 hostnames = [hn.attrib.get('name') for hn in host.findall('.//hostname')]
@@ -95,24 +121,15 @@ def run_nmap(
                 "success": True,
                 "target": target,
                 "warning": f"XML parsing failed: {str(pe)}",
-                "raw_snippet": result.stdout[:2000]
+                "raw_snippet": xml_content[:2000]
             })
 
         return json.dumps({
             "success": True,
             "target": target,
-            "ports": ports if ports else "top-1000",
             "results": parsed_hosts
         })
 
-    except subprocess.CalledProcessError as e:
-        logger.error(f"[nmap] Command failed with return code {e.returncode}")
-        logger.error(f"[nmap] stderr: {e.stderr}")
-        return json.dumps({
-            "success": False,
-            "error": str(e),
-            "stderr": e.stderr
-        })
     except Exception as e:
         logger.error(f"[nmap] Exception: {str(e)}")
         return json.dumps({

@@ -31,32 +31,56 @@ def run_sqlmap(
         if options:
             cmd.extend(options)
 
-        # Run the command
-        result = subprocess.run(
+        # Run the command with streaming output
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            check=True
+            bufsize=1
         )
+
+        full_output = []
+        if process.stdout:
+            for line in process.stdout:
+                full_output.append(line)
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                
+                # Print progress (sqlmap lines usually start with [HH:MM:SS])
+                if "[" in clean_line and "]" in clean_line:
+                    print(f"💉 [sqlmap] {clean_line}", flush=True)
+
+        process.wait()
+        return_code = process.returncode
+        stdout_str = "".join(full_output)
+
+        if return_code != 0:
+            return json.dumps({
+                "success": False,
+                "error": f"Command returned non-zero exit code {return_code}",
+                "stdout": stdout_str
+            })
 
         # Save the full output to a file
         import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/sqlmap_latest.log", "w") as f:
-            f.write(result.stdout)
+            f.write(stdout_str)
 
         # Parse the output for a summary
         # Look for "vulnerable" or "Payload:" in the last 5000 chars
-        summary_log = result.stdout[-2000:]
-        if "is vulnerable" in result.stdout:
+        summary_log = stdout_str[-2000:]
+        if "is vulnerable" in stdout_str:
             # Try to find the vulnerability details
-            vuln_start = result.stdout.find("is vulnerable")
-            summary_log = result.stdout[vuln_start-100:vuln_start+1000]
+            vuln_start = stdout_str.find("is vulnerable")
+            summary_log = stdout_str[vuln_start-100:vuln_start+1000]
 
         return json.dumps({
             "success": True,
             "url": url,
-            "is_vulnerable": "is vulnerable" in result.stdout,
+            "is_vulnerable": "is vulnerable" in stdout_str,
             "summary_log": summary_log,
             "note": "Use fetch_sqlmap_output() to see the full log including HTTP traffic."
         })

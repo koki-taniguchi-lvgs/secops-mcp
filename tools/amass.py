@@ -20,16 +20,33 @@ def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
             cmd.append("-passive")
         cmd.extend(["-d", domain])
         
-        # Run the command
-        result = subprocess.run(
+        # Run the command with streaming output
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=True
+            bufsize=1
         )
+
+        subdomains = []
+        if process.stdout:
+            for line in process.stdout:
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                subdomains.append(clean_line)
+                print(f"🔍 [amass] Found: {clean_line}", flush=True)
+
+        _, stderr = process.communicate()
+        return_code = process.wait()
         
-        # Parse the output (plain text, each line is a subdomain)
-        subdomains = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if return_code != 0:
+            return {
+                "success": False,
+                "error": f"Command returned non-zero exit code {return_code}",
+                "stderr": stderr
+            }
         
         # Save all results
         import os
@@ -46,15 +63,9 @@ def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
             "subdomains_summary": summary,
             "total_count": len(subdomains),
             "is_truncated": len(subdomains) > limit,
-            "note": "Use fetch_all_subdomains() if you need the full list."
+            "note": "Use fetch_stored_results() if you need the full list."
         }
         
-    except subprocess.CalledProcessError as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "stderr": e.stderr
-        }
     except Exception as e:
         return {
             "success": False,

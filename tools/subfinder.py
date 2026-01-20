@@ -31,58 +31,61 @@ def run_subfinder(
         cmd = ["subfinder", "-d", domain, "-json"]
         
         logger.info(f"[subfinder] Executing command: {' '.join(cmd)}")
-        logger.info(f"[subfinder] Domain: {domain}")
         
-        # Run the command
-        result = subprocess.run(
+        # Run the command with streaming output
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=True
+            bufsize=1
         )
-        
-        logger.info(f"[subfinder] Command completed successfully")
-        logger.info(f"[subfinder] Output lines: {len(result.stdout.splitlines())}")
-        if result.stderr:
-            logger.info(f"[subfinder] stderr: {result.stderr}")
-        
-        # Parse line-delimited JSON output
-        try:
-            lines = [line for line in result.stdout.splitlines() if line.strip()]
-            data = [json.loads(line) for line in lines]
-            
-            # Save all results to storage
-            import os
-            os.makedirs("/tmp/secops_results", exist_ok=True)
-            with open("/tmp/secops_results/subfinder_latest.json", "w") as f:
-                json.dump(data, f)
 
-            # Return a summary to avoid context overflow
-            limit = 100
-            summary_data = data[:limit]
-            
-            return json.dumps({
-                "success": True,
-                "domain": domain,
-                "summary": summary_data,
-                "total_found": len(data),
-                "is_truncated": len(data) > limit,
-                "note": "Use fetch_all_subdomains() if you need the full list."
-            })
-        except json.JSONDecodeError:
+        data = []
+        if process.stdout:
+            for line in process.stdout:
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                try:
+                    obj = json.loads(clean_line)
+                    data.append(obj)
+                    if "host" in obj:
+                        print(f"🔍 [subfinder] Found: {obj['host']}", flush=True)
+                except json.JSONDecodeError:
+                    continue
+        
+        _, stderr = process.communicate()
+        return_code = process.wait()
+        
+        if return_code != 0:
+            logger.error(f"[subfinder] Command failed with return code {return_code}")
             return json.dumps({
                 "success": False,
-                "error": "Failed to parse JSON output",
-                "raw_output": result.stdout
+                "error": f"Command failed with return code {return_code}",
+                "stderr": stderr
             })
+
+        logger.info(f"[subfinder] Command completed successfully")
+        logger.info(f"[subfinder] Total found: {len(data)}")
         
-    except subprocess.CalledProcessError as e:
-        logger.error(f"[subfinder] Command failed with return code {e.returncode}")
-        logger.error(f"[subfinder] stderr: {e.stderr}")
+        # Save all results to storage
+        import os
+        os.makedirs("/tmp/secops_results", exist_ok=True)
+        with open("/tmp/secops_results/subfinder_latest.json", "w") as f:
+            json.dump(data, f)
+
+        # Return a summary to avoid context overflow
+        limit = 100
+        summary_data = data[:limit]
+        
         return json.dumps({
-            "success": False,
-            "error": str(e),
-            "stderr": e.stderr
+            "success": True,
+            "domain": domain,
+            "summary": summary_data,
+            "total_found": len(data),
+            "is_truncated": len(data) > limit,
+            "note": "Use fetch_stored_results() if you need the full list."
         })
     except Exception as e:
         logger.error(f"[subfinder] Exception: {str(e)}")

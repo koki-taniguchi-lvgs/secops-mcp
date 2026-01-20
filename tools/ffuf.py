@@ -23,7 +23,29 @@ def run_ffuf(
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmpfile:
             output_path = tmpfile.name
         cmd = ["ffuf", "-w", wordlist, "-u", url, "-of", "json", "-o", output_path]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Run the command with streaming output
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+
+        if process.stdout:
+            for line in process.stdout:
+                clean_line = line.strip()
+                if not clean_line:
+                    continue
+                # ffuf prints progress like [Status: 200, Size: 19, Words: 2, Lines: 2]
+                if "[Status:" in clean_line:
+                    print(f"🚀 [ffuf] Found: {clean_line}", flush=True)
+                elif "Progress:" in clean_line:
+                    print(f"📊 [ffuf] {clean_line}", flush=True)
+
+        process.wait()
+
         try:
             with open(output_path, "r") as f:
                 data = json.load(f)
