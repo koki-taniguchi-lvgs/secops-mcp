@@ -1,14 +1,15 @@
 import subprocess
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
-def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
+def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Wrapper for Amass subdomain enumeration tool.
     
     Args:
         domain (str): Target domain to enumerate
         passive (bool): Whether to perform passive enumeration only
+        options (List[str]): Additional Amass options (e.g., ["-active", "-brute"])
     
     Returns:
         Dict[str, Any]: Results containing discovered subdomains and related information
@@ -19,6 +20,7 @@ def amass_wrapper(domain: str, passive: bool = True) -> Dict[str, Any]:
         if passive:
             cmd.append("-passive")
         cmd.extend(["-d", domain])
+        if options: cmd.extend(options)
         
         # Run the command with streaming output
         process = subprocess.Popen(

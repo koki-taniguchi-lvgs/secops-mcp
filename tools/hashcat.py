@@ -1,12 +1,13 @@
 import subprocess
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 def run_hashcat(
     hash_file: str,
     wordlist: str,
     mode: Optional[int] = 0,  # Default to MD5
+    options: Optional[List[str]] = None,
 ) -> str:
     """Run Hashcat to crack hashes.
     
@@ -14,13 +15,16 @@ def run_hashcat(
         hash_file: Path to file containing hashes
         wordlist: Path to wordlist file
         mode: Hash type (e.g., 0 for MD5, 1000 for NTLM)
+        options: Additional hashcat options (e.g., ["--force", "-O"])
     
     Returns:
         str: JSON string containing cracking results
     """
     try:
         # Build the command
-        cmd = ["/tools/hashcat/hashcat.bin", "-m", str(mode), "--potfile-disable", "--outfile-format=2", hash_file, wordlist]
+        cmd = ["/tools/hashcat/hashcat.bin", "-m", str(mode), "--potfile-disable", "--outfile-format=2"]
+        if options: cmd.extend(options)
+        cmd.extend([hash_file, wordlist])
         
         # Run the command
         result = subprocess.run(

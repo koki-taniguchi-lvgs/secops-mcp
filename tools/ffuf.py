@@ -1,12 +1,13 @@
 import subprocess
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 def run_ffuf(
     url: str,
     wordlist: str,
     filter_code: Optional[str] = "404",
+    options: Optional[List[str]] = None,
 ) -> str:
     """Run ffuf to fuzz web application endpoints.
     
@@ -14,6 +15,7 @@ def run_ffuf(
         url: Target URL with FUZZ keyword (e.g., "http://example.com/FUZZ")
         wordlist: Path to wordlist file
         filter_code: HTTP status code to filter out (e.g., "404")
+        options: Additional ffuf options (e.g., ["-recursion", "-v"])
     
     Returns:
         Dict[str, Any]: Dictionary containing fuzzing results
@@ -23,6 +25,7 @@ def run_ffuf(
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmpfile:
             output_path = tmpfile.name
         cmd = ["ffuf", "-w", wordlist, "-u", url, "-of", "json", "-o", output_path]
+        if options: cmd.extend(options)
         
         # Run the command with streaming output
         process = subprocess.Popen(

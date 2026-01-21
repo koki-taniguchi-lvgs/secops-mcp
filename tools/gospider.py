@@ -12,7 +12,8 @@ def gospider_wrapper(
     headers: Optional[List[str]] = None,
     include_subs: bool = False,
     include_other_source: bool = False,
-    output_format: str = "json"
+    output_format: str = "json",
+    options: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Wrapper for Gospider web crawling tool.
@@ -27,6 +28,7 @@ def gospider_wrapper(
         include_subs (bool): Include subdomains in crawling
         include_other_source (bool): Include other sources like robots.txt, sitemap.xml
         output_format (str): Output format (json, txt)
+        options (List[str]): Additional Gospider options (e.g., ["--blacklist", ".*\.js"])
 
     Returns:
         Dict[str, Any]: Results containing discovered URLs and related information
@@ -62,6 +64,9 @@ def gospider_wrapper(
             
         if output_format == "json":
             cmd.append("--json")
+
+        if options:
+            cmd.extend(options)
         
         # Run the command with streaming output
         process = subprocess.Popen(

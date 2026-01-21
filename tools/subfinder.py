@@ -16,19 +16,25 @@ logger = logging.getLogger(__name__)
 def run_subfinder(
     domain: str,
     output_format: Optional[str] = "json",
+    options: Optional[List[str]] = None,
 ) -> str:
     """Run subfinder to enumerate subdomains.
     
     Args:
         domain: Target domain to enumerate
         output_format: Output format (text or json)
+        options: Additional subfinder options (e.g., ["-all", "-recursive"])
     
     Returns:
         str: JSON string containing enumeration results
     """
     try:
+        from typing import List
         # Build the command
-        cmd = ["subfinder", "-d", domain, "-json"]
+        cmd = ["subfinder", "-d", domain, "-silent"]
+        if output_format == "json":
+            cmd.append("-json")
+        if options: cmd.extend(options)
         
         logger.info(f"[subfinder] Executing command: {' '.join(cmd)}")
         

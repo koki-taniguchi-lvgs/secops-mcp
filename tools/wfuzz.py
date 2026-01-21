@@ -1,26 +1,30 @@
 import subprocess
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 def run_wfuzz(
     url: str,
     wordlist: str,
     show_code: Optional[str] = "200,302,403,500",
+    options: Optional[List[str]] = None,
 ) -> str:
     """Run wfuzz to fuzz web application endpoints.
     
     Args:
         url: Target URL with FUZZ keyword (e.g., "http://example.com/FUZZ")
         wordlist: Path to wordlist file
-        hide_code: HTTP status code to hide (e.g., "404")
+        show_code: HTTP status code to show (e.g., "200,302")
+        options: Additional wfuzz options (e.g., ["-t", "100"])
     
     Returns:
         Dict[str, Any]: Dictionary containing fuzzing results
     """
     try:
     # Build the command
-        cmd = ["wfuzz", "-w", wordlist, "--sc", show_code, "-o", "json", url]
+        cmd = ["wfuzz", "-w", wordlist, "--sc", show_code, "-o", "json"]
+        if options: cmd.extend(options)
+        cmd.append(url)
 
         # Run the command
         result = subprocess.run(

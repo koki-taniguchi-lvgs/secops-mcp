@@ -12,7 +12,8 @@ def arjun_wrapper(
     timeout: int = 10,
     threads: int = 25,
     stable: bool = False,
-    output_format: str = "json"
+    output_format: str = "json",
+    options: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Wrapper for Arjun HTTP parameter discovery tool.
@@ -28,6 +29,7 @@ def arjun_wrapper(
         threads (int): Number of threads to use
         stable (bool): Use stable mode for fewer false positives
         output_format (str): Output format (json, txt)
+        options (List[str]): Additional Arjun options (e.g., ["--passive", "--include"])
     
     Returns:
         Dict[str, Any]: Results containing discovered parameters
@@ -65,6 +67,9 @@ def arjun_wrapper(
         else:
             cmd.append("-oT")
             cmd.append("-")  # Output to stdout
+
+        if options:
+            cmd.extend(options)
         
         # Run the command
         result = subprocess.run(

@@ -1,15 +1,16 @@
 import subprocess
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
-def run_tlsx(host: str, port: Optional[int] = 443) -> str:
+def run_tlsx(host: str, port: Optional[int] = 443, options: Optional[List[str]] = None) -> str:
     """
     Run tlsx to analyze TLS configurations.
     
     Args:
         host: Target hostname or IP address
         port: Target port (default: 443)
+        options: Additional tlsx options (e.g., ["-ex", "-san"])
     
     Returns:
         str: JSON string containing TLS analysis results
@@ -17,6 +18,7 @@ def run_tlsx(host: str, port: Optional[int] = 443) -> str:
     try:
         # Build the command
         cmd = ["tlsx", "-host", host, "-port", str(port), "-json"]
+        if options: cmd.extend(options)
         
         # Run the command
         result = subprocess.run(

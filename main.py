@@ -59,9 +59,18 @@ def nuclei_scan_wrapper(
     templates: Optional[List[str]] = None,
     severity: Optional[str] = None,
     output_format: str = "json",
+    options: Optional[List[str]] = None,
 ) -> str:
-    """Wrapper for running a Nuclei security scan."""
-    return run_nuclei(target, templates, severity, output_format)
+    """Wrapper for running a Nuclei security scan.
+    
+    Args:
+        target: The target URL or IP to scan
+        templates: List of specific template names to use (optional)
+        severity: Filter by severity level (critical, high, medium, low, info)
+        output_format: Output format (json, text)
+        options: Additional Nuclei options (e.g., ["-vv", "-rl", "100"])
+    """
+    return run_nuclei(target, templates, severity, output_format, options)
 
 
 @mcp.tool()
@@ -134,9 +143,17 @@ def ffuf_wrapper(
     url: str,
     wordlist: str,
     filter_code: Optional[str] = "404",
+    options: Optional[List[str]] = None,
 ) -> str:
-    """Wrapper for running ffuf fuzzing."""
-    return run_ffuf(url, wordlist, filter_code)
+    """Wrapper for running ffuf fuzzing.
+    
+    Args:
+        url: Target URL with FUZZ keyword
+        wordlist: Path to wordlist file
+        filter_code: HTTP code to filter
+        options: Additional ffuf options (e.g., ["-recursion"])
+    """
+    return run_ffuf(url, wordlist, filter_code, options)
 
 
 @mcp.tool()
@@ -144,9 +161,17 @@ def wfuzz_wrapper(
     url: str,
     wordlist: str,
     hide_code: Optional[str] = "404",
+    options: Optional[List[str]] = None,
 ) -> str:
-    """Wrapper for running wfuzz fuzzing."""
-    result = run_wfuzz(url, wordlist, hide_code)
+    """Wrapper for running wfuzz fuzzing.
+    
+    Args:
+        url: Target URL with FUZZ keyword
+        wordlist: Path to wordlist file
+        hide_code: HTTP code to hide
+        options: Additional wfuzz options
+    """
+    result = run_wfuzz(url, wordlist, hide_code, options)
     try:
         if result:
             data = json.loads(result)
@@ -181,9 +206,10 @@ def hashcat_wrapper(
     hash_file: str,
     wordlist: str,
     mode: int = 0,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running Hashcat password cracking."""
-    return run_hashcat(hash_file, wordlist, mode)
+    return run_hashcat(hash_file, wordlist, mode, options)
 
 
 @mcp.tool()
@@ -211,9 +237,10 @@ def httpx_wrapper(
 def subfinder_wrapper(
     domain: str,
     output_format: Optional[str] = "json",
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running Subfinder subdomain enumeration."""
-    result = run_subfinder(domain, output_format)
+    result = run_subfinder(domain, output_format, options)
     try:
         # result is already a JSON string from run_subfinder
         parsed = json.loads(result)
@@ -226,9 +253,10 @@ def subfinder_wrapper(
 def tlsx_wrapper(
     host: str,
     port: Optional[int] = 443,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running TLSX scan."""
-    return run_tlsx(host, port)
+    return run_tlsx(host, port, options)
 
 
 @mcp.tool()
@@ -252,9 +280,10 @@ def ipinfo_wrapper(
 def amass_scan(
     domain: str,
     passive: bool = True,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running Amass subdomain enumeration."""
-    result = amass_tool(domain, passive)
+    result = amass_tool(domain, passive, options)
     return json.dumps(result, indent=2)
 
 
@@ -263,9 +292,10 @@ def dirsearch_wrapper(
     url: str,
     extensions: Optional[List[str]] = None,
     wordlist: Optional[str] = None,
+    options: Optional[List[str]] = None,
 ) -> str:
     """Wrapper for running Dirsearch directory brute forcing."""
-    result = dirsearch_tool(url, extensions, wordlist)
+    result = dirsearch_tool(url, extensions, wordlist, options)
     return json.dumps(result, indent=2)
 
 
@@ -279,7 +309,8 @@ def gospider_scan(
     headers: Optional[List[str]] = None,
     include_subs: bool = False,
     include_other_source: bool = False,
-    output_format: str = "json"
+    output_format: str = "json",
+    options: Optional[List[str]] = None
 ) -> str:
     """Wrapper for running Gospider web crawling."""
     result = gospider_wrapper(
@@ -291,7 +322,8 @@ def gospider_scan(
         headers=headers,
         include_subs=include_subs,
         include_other_source=include_other_source,
-        output_format=output_format
+        output_format=output_format,
+        options=options
     )
     return json.dumps(result, indent=2)
 
@@ -332,7 +364,8 @@ def arjun_scan(
     timeout: int = 10,
     threads: int = 25,
     stable: bool = False,
-    output_format: str = "json"
+    output_format: str = "json",
+    options: Optional[List[str]] = None
 ) -> str:
     """Wrapper for running Arjun HTTP parameter discovery."""
     result = arjun_wrapper(
@@ -345,7 +378,8 @@ def arjun_scan(
         timeout=timeout,
         threads=threads,
         stable=stable,
-        output_format=output_format
+        output_format=output_format,
+        options=options
     )
     return json.dumps(result, indent=2)
 

@@ -2,7 +2,12 @@ import subprocess
 import json
 from typing import Optional, List, Dict, Any
 
-def dirsearch_wrapper(url: str, extensions: Optional[List[str]] = None, wordlist: Optional[str] = None) -> Dict[str, Any]:
+def dirsearch_wrapper(
+    url: str,
+    extensions: Optional[List[str]] = None,
+    wordlist: Optional[str] = None,
+    options: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """
     Wrapper for Dirsearch directory and file brute forcer.
     
@@ -10,6 +15,7 @@ def dirsearch_wrapper(url: str, extensions: Optional[List[str]] = None, wordlist
         url (str): Target URL to scan
         extensions (List[str], optional): File extensions to check
         wordlist (str, optional): Path to custom wordlist
+        options (List[str], optional): Additional Dirsearch options (e.g., ["-t", "100", "--recursive"])
     
     Returns:
         Dict[str, Any]: Results containing discovered paths and their status codes
@@ -21,6 +27,8 @@ def dirsearch_wrapper(url: str, extensions: Optional[List[str]] = None, wordlist
             cmd.extend(["-e", ",".join(extensions)])
         if wordlist:
             cmd.extend(["-w", wordlist])
+        if options:
+            cmd.extend(options)
 
         # Run the command with streaming output
         process = subprocess.Popen(
