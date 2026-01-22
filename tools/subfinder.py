@@ -1,6 +1,6 @@
 import subprocess
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import logging
 import sys
 
@@ -17,6 +17,7 @@ def run_subfinder(
     domain: str,
     output_format: Optional[str] = "json",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run subfinder to enumerate subdomains.
     
@@ -24,6 +25,7 @@ def run_subfinder(
         domain: Target domain to enumerate
         output_format: Output format (text or json)
         options: Additional subfinder options (e.g., ["-all", "-recursive"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         str: JSON string containing enumeration results
@@ -34,6 +36,7 @@ def run_subfinder(
         cmd = ["subfinder", "-d", domain, "-silent"]
         if output_format == "json":
             cmd.append("-json")
+        if rate_limit: cmd.extend(["-rl", str(rate_limit)])
         if options: cmd.extend(options)
         
         logger.info(f"[subfinder] Executing command: {' '.join(cmd)}")
@@ -79,7 +82,7 @@ def run_subfinder(
         import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/subfinder_latest.json", "w") as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=2)
 
         # Return a summary to avoid context overflow
         limit = 100
@@ -91,7 +94,7 @@ def run_subfinder(
             "summary": summary_data,
             "total_found": len(data),
             "is_truncated": len(data) > limit,
-            "note": "Use fetch_stored_results() if you need the full list."
+            "note": "Use grep_stored_results('subfinder', pattern) if you need to search the full list."
         })
     except Exception as e:
         logger.error(f"[subfinder] Exception: {str(e)}")

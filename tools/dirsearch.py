@@ -6,7 +6,8 @@ def dirsearch_wrapper(
     url: str,
     extensions: Optional[List[str]] = None,
     wordlist: Optional[str] = None,
-    options: Optional[List[str]] = None
+    options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Wrapper for Dirsearch directory and file brute forcer.
@@ -16,6 +17,7 @@ def dirsearch_wrapper(
         extensions (List[str], optional): File extensions to check
         wordlist (str, optional): Path to custom wordlist
         options (List[str], optional): Additional Dirsearch options (e.g., ["-t", "100", "--recursive"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         Dict[str, Any]: Results containing discovered paths and their status codes
@@ -27,6 +29,8 @@ def dirsearch_wrapper(
             cmd.extend(["-e", ",".join(extensions)])
         if wordlist:
             cmd.extend(["-w", wordlist])
+        if rate_limit:
+            cmd.extend(["--max-rate", str(rate_limit)])
         if options:
             cmd.extend(options)
 
@@ -83,7 +87,7 @@ def dirsearch_wrapper(
         import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/dirsearch_latest.json", "w") as f:
-            json.dump(findings, f)
+            json.dump(findings, f, indent=2)
 
         # Return a summary
         limit = 100
@@ -94,7 +98,7 @@ def dirsearch_wrapper(
             "results_summary": summary,
             "total": len(findings),
             "is_truncated": len(findings) > limit,
-            "note": "Use fetch_dirsearch_results() for the full list."
+            "note": "Use grep_stored_results('dirsearch', pattern) to search the full list."
         })
 
     except Exception as e:

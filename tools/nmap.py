@@ -17,6 +17,7 @@ def run_nmap(
     target: str,
     ports: Optional[str] = None,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run an Nmap network scan on the specified target.
     
@@ -24,20 +25,36 @@ def run_nmap(
         target: The target IP or hostname to scan
         ports: Specific ports to scan (e.g., "22,80,443")
         options: Additional Nmap options (e.g., ["-sV", "-A"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         str: JSON string containing scan results
     """
+    import tempfile
+    import os
+
+    # Create a temporary file for XML output
+    xml_fd, xml_path = tempfile.mkstemp(suffix=".xml", prefix="nmap_")
+    os.close(xml_fd)
+
     try:
-        # Build the command with verbosity and speed
-        cmd = ["nmap", "-v", "-T5"]
+        # Build the command with extra verbosity and status updates
+        # Verbosity level 2 (-vv) is used to ensure open ports are logged as discovered.
+        cmd = ["nmap", "-vv", "-T5"]
         # Only add -p if ports are specified; otherwise, scan top 1000 ports (nmap default)
         if ports:
             cmd.extend(["-p", ports])
+        if rate_limit:
+            cmd.extend(["--max-rate", str(rate_limit)])
         if options:
             cmd.extend(options)
-        # Output in XML format to stdout
-        cmd.extend(["-oX", "-", target])
+        
+        # We explicitly add --stats-every at the end of the arguments to override any defaults.
+        # Nmap's progress updates often use \r; we ensure these are handled in the logging loop.
+        cmd.extend(["--stats-every", "10s"])
+        
+        # Output in XML format to the temporary file
+        cmd.extend(["-oX", xml_path, target])
 
         logger.info(f"[nmap] Executing command: {' '.join(cmd)}")
         
@@ -51,23 +68,33 @@ def run_nmap(
         )
 
         full_output = []
-        xml_lines = []
         if process.stdout:
+            # We want to read byte-by-byte or small chunks to catch \r updates
+            # but for simplicity in Python text-mode, we can use a loop that handles both \r and \n.
+            # However, nmap redirected to a pipe usually uses \n for --stats-every.
             for line in process.stdout:
                 full_output.append(line)
-                clean_line = line.strip()
-                if not clean_line:
-                    continue
-                
-                # Nmap XML output lines usually start with <
-                if clean_line.startswith("<"):
-                    xml_lines.append(line)
-                else:
+                # handle lines separated by \r within the line
+                for subline in line.replace('\r', '\n').split('\n'):
+                    clean_line = subline.strip()
+                    if not clean_line:
+                        continue
+                    
                     # Print progress and other info
-                    print(f"📊 [nmap] {clean_line}", flush=True)
+                    logger.info(f"📊 [nmap] {clean_line}")
 
         process.wait()
         return_code = process.returncode
+
+        # Read the XML content from the file
+        xml_content = ""
+        if os.path.exists(xml_path):
+            with open(xml_path, "r") as f:
+                xml_content = f.read()
+            try:
+                os.remove(xml_path)
+            except:
+                pass
         
         if return_code != 0:
             logger.error(f"[nmap] Command failed with return code {return_code}")
@@ -77,12 +104,10 @@ def run_nmap(
                 "stdout": "".join(full_output)
             })
 
-        xml_content = "".join(xml_lines)
         logger.info(f"[nmap] Command completed successfully")
         logger.info(f"[nmap] XML output length: {len(xml_content)} bytes")
 
         # Save raw XML to storage
-        import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/nmap_raw.xml", "w") as f:
             f.write(xml_content)

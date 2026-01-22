@@ -8,6 +8,7 @@ def run_ffuf(
     wordlist: str,
     filter_code: Optional[str] = "404",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run ffuf to fuzz web application endpoints.
     
@@ -16,6 +17,7 @@ def run_ffuf(
         wordlist: Path to wordlist file
         filter_code: HTTP status code to filter out (e.g., "404")
         options: Additional ffuf options (e.g., ["-recursion", "-v"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         Dict[str, Any]: Dictionary containing fuzzing results
@@ -25,6 +27,7 @@ def run_ffuf(
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmpfile:
             output_path = tmpfile.name
         cmd = ["ffuf", "-w", wordlist, "-u", url, "-of", "json", "-o", output_path]
+        if rate_limit: cmd.extend(["-rate", str(rate_limit)])
         if options: cmd.extend(options)
         
         # Run the command with streaming output
@@ -67,7 +70,7 @@ def run_ffuf(
             import os
             os.makedirs("/tmp/secops_results", exist_ok=True)
             with open("/tmp/secops_results/ffuf_latest.json", "w") as f:
-                json.dump(data.get("results", []), f)
+                json.dump(data.get("results", []), f, indent=2)
 
             # Return a summary
             limit = 100
@@ -79,7 +82,7 @@ def run_ffuf(
                 "summary": summary,
                 "total": len(findings),
                 "is_truncated": len(findings) > limit,
-                "note": "Use fetch_stored_results('ffuf') for the full list."
+                "note": "Use grep_stored_results('ffuf', pattern) to search the full list."
             })
         except Exception as e:
             return json.dumps({

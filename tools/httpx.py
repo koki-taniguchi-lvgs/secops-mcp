@@ -7,6 +7,7 @@ def run_httpx(
     targets: List[str],
     options: Optional[List[str]] = None,
     input_file: Optional[str] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run httpx to probe HTTP servers.
     
@@ -14,6 +15,7 @@ def run_httpx(
         targets: List of target URLs or IPs
         options: Additional httpx options (e.g., ["-status-code", "-title"])
         input_file: Path to file containing URLs (optional)
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         str: JSON string containing probe results
@@ -22,6 +24,7 @@ def run_httpx(
         if input_file:
             # Use file input
             cmd = ["httpx", "-json", "-l", input_file]
+            if rate_limit: cmd.extend(["-rl", str(rate_limit)])
             if options:
                 cmd.extend(options)
             result = subprocess.run(
@@ -33,6 +36,7 @@ def run_httpx(
         else:
             # Use stdin for both single URLs and lists
             cmd = ["httpx", "-json"]
+            if rate_limit: cmd.extend(["-rl", str(rate_limit)])
             if options:
                 cmd.extend(options)
             result = subprocess.run(
@@ -54,7 +58,7 @@ def run_httpx(
             import os
             os.makedirs("/tmp/secops_results", exist_ok=True)
             with open("/tmp/secops_results/httpx_latest.json", "w") as f:
-                json.dump(results, f)
+                json.dump(results, f, indent=2)
 
             # Return a summary
             limit = 100
@@ -66,7 +70,7 @@ def run_httpx(
                 "summary": summary,
                 "total_count": len(results),
                 "is_truncated": len(results) > limit,
-                "note": "Use fetch_stored_results('httpx') for the full list."
+                "note": "Use grep_stored_results('httpx', pattern) to search the full list."
             })
         except Exception as e:
             return json.dumps({

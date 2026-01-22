@@ -13,7 +13,8 @@ def gospider_wrapper(
     include_subs: bool = False,
     include_other_source: bool = False,
     output_format: str = "json",
-    options: Optional[List[str]] = None
+    options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Wrapper for Gospider web crawling tool.
@@ -29,6 +30,7 @@ def gospider_wrapper(
         include_other_source (bool): Include other sources like robots.txt, sitemap.xml
         output_format (str): Output format (json, txt)
         options (List[str]): Additional Gospider options (e.g., ["--blacklist", ".*\.js"])
+        rate_limit: Maximum requests per second (optional)
 
     Returns:
         Dict[str, Any]: Results containing discovered URLs and related information
@@ -49,6 +51,10 @@ def gospider_wrapper(
         cmd.extend(["-c", str(concurrent)])
         cmd.extend(["-t", str(timeout)])
         
+        if rate_limit:
+            delay = 1.0 / rate_limit
+            cmd.extend(["--delay", str(delay)])
+            
         if user_agent:
             cmd.extend(["-u", user_agent])
             
@@ -147,7 +153,7 @@ def gospider_wrapper(
             "other": other
         }
         with open("/tmp/secops_results/gospider_latest.json", "w") as f:
-            json.dump(all_results, f)
+            json.dump(all_results, f, indent=2)
 
         # Return a summary
         limit = 50
@@ -165,7 +171,7 @@ def gospider_wrapper(
                 "total_secrets": len(secrets)
             },
             "is_truncated": len(urls) > limit or len(forms) > limit or len(secrets) > limit,
-            "note": "Use fetch_gospider_results() for the full list."
+            "note": "Use grep_stored_results('gospider', pattern) to search the full list."
         }
         
     except Exception as e:

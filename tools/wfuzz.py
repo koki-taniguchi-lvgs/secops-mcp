@@ -8,6 +8,7 @@ def run_wfuzz(
     wordlist: str,
     show_code: Optional[str] = "200,302,403,500",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run wfuzz to fuzz web application endpoints.
     
@@ -16,6 +17,7 @@ def run_wfuzz(
         wordlist: Path to wordlist file
         show_code: HTTP status code to show (e.g., "200,302")
         options: Additional wfuzz options (e.g., ["-t", "100"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         Dict[str, Any]: Dictionary containing fuzzing results
@@ -23,6 +25,9 @@ def run_wfuzz(
     try:
     # Build the command
         cmd = ["wfuzz", "-w", wordlist, "--sc", show_code, "-o", "json"]
+        if rate_limit:
+            delay = 1.0 / rate_limit
+            cmd.extend(["--delay", str(delay)])
         if options: cmd.extend(options)
         cmd.append(url)
 
@@ -51,7 +56,7 @@ def run_wfuzz(
         import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/wfuzz_latest.json", "w") as f:
-            json.dump(findings, f)
+            json.dump(findings, f, indent=2)
 
         # Return a summary
         limit = 100
@@ -63,7 +68,7 @@ def run_wfuzz(
             "summary": summary,
             "total": len(findings),
             "is_truncated": len(findings) > limit,
-            "note": "Use fetch_stored_results('wfuzz') for the full list."
+            "note": "Use grep_stored_results('wfuzz', pattern) to search the full list."
         })
 
     except subprocess.CalledProcessError as e:

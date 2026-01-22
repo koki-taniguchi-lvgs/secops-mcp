@@ -2,7 +2,7 @@ import subprocess
 import json
 from typing import Optional, Dict, Any, List
 
-def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]] = None) -> Dict[str, Any]:
+def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]] = None, rate_limit: Optional[int] = None) -> Dict[str, Any]:
     """
     Wrapper for Amass subdomain enumeration tool.
     
@@ -10,6 +10,7 @@ def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]
         domain (str): Target domain to enumerate
         passive (bool): Whether to perform passive enumeration only
         options (List[str]): Additional Amass options (e.g., ["-active", "-brute"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         Dict[str, Any]: Results containing discovered subdomains and related information
@@ -20,6 +21,8 @@ def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]
         if passive:
             cmd.append("-passive")
         cmd.extend(["-d", domain])
+        if rate_limit:
+            cmd.extend(["-dns-qps", str(rate_limit)])
         if options: cmd.extend(options)
         
         # Run the command with streaming output
@@ -54,7 +57,7 @@ def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]
         import os
         os.makedirs("/tmp/secops_results", exist_ok=True)
         with open("/tmp/secops_results/amass_latest.json", "w") as f:
-            json.dump(subdomains, f)
+            json.dump(subdomains, f, indent=2)
             
         # Return a summary
         limit = 100
@@ -65,7 +68,7 @@ def amass_wrapper(domain: str, passive: bool = True, options: Optional[List[str]
             "subdomains_summary": summary,
             "total_count": len(subdomains),
             "is_truncated": len(subdomains) > limit,
-            "note": "Use fetch_stored_results() if you need the full list."
+            "note": "Use grep_stored_results('amass', pattern) if you need to search the full list."
         }
         
     except Exception as e:

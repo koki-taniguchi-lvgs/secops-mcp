@@ -10,6 +10,7 @@ def run_nuclei(
     severity: Optional[str] = None,
     output_format: str = "json",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run a Nuclei security scan on the specified target.
     
@@ -18,7 +19,8 @@ def run_nuclei(
         templates: List of specific template names to use (optional)
         severity: Filter by severity level (critical, high, medium, low, info)
         output_format: Output format (json, text)
-        options: Additional Nuclei options (e.g., ["-vv", "-rl", "100"])
+        options: Additional Nuclei options (e.g., ["-vv"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         str: JSON string containing scan results
@@ -28,6 +30,7 @@ def run_nuclei(
         cmd = ["nuclei", "-u", target, "-j", "-stats", "-stats-interval", "30", "-sj"]
         if templates: cmd.extend(["-t", ",".join(templates)])
         if severity: cmd.extend(["-s", severity])
+        if rate_limit: cmd.extend(["-rl", str(rate_limit)])
         if options: cmd.extend(options)
         
         findings = []

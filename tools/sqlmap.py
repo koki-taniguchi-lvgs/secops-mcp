@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 def run_sqlmap(
     url: str,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """
     Run sqlmap to test for SQL injection vulnerabilities.
@@ -13,6 +14,7 @@ def run_sqlmap(
     Args:
         url: Target URL to scan (should include a parameter, e.g., 'http://testphp.vulnweb.com/listproducts.php?cat=1')
         options: Additional sqlmap options (e.g., ["--dbs", "--batch"])
+        rate_limit: Maximum requests per second (optional)
 
     Returns:
         str: JSON string containing scan results
@@ -28,6 +30,9 @@ def run_sqlmap(
 
         # Build the command
         cmd = ["sqlmap", "-u", url, "--batch", "--output-dir=/tmp/sqlmap"]
+        if rate_limit:
+            delay = 1.0 / rate_limit
+            cmd.extend(["--delay", str(delay)])
         if options:
             cmd.extend(options)
 
@@ -82,7 +87,7 @@ def run_sqlmap(
             "url": url,
             "is_vulnerable": "is vulnerable" in stdout_str,
             "summary_log": summary_log,
-            "note": "Use fetch_sqlmap_output() to see the full log including HTTP traffic."
+            "note": "Use grep_stored_results('sqlmap', pattern) to search the full log."
         })
         
     except subprocess.CalledProcessError as e:

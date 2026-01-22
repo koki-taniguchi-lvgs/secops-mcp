@@ -6,12 +6,14 @@ from typing import List, Optional, Dict, Any
 def run_xsstrike(
     url: str,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Run XSStrike to detect XSS vulnerabilities.
     
     Args:
         url: Target URL to scan
         options: Additional XSStrike options (e.g., ["--crawl", "--blind"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         str: JSON string containing scan results
@@ -24,6 +26,11 @@ def run_xsstrike(
             cmd = [xsstrike_path, "-u", url]
         else:
             cmd = ["python3", "/opt/XSStrike/xsstrike.py", "-u", url]
+        
+        if rate_limit:
+            delay = 1.0 / rate_limit
+            cmd.extend(["--delay", str(delay)])
+            
         if options:
             cmd.extend(options)
         
@@ -46,7 +53,7 @@ def run_xsstrike(
             "success": True,
             "url": url,
             "summary_log": result.stdout[-2000:],
-            "note": "Use fetch_stored_results('xsstrike') for the full log."
+            "note": "Use grep_stored_results('xsstrike', pattern) to search the full log."
         })
         
     except subprocess.CalledProcessError as e:

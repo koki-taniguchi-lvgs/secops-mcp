@@ -1,4 +1,5 @@
 import json
+import subprocess
 from typing import List, Optional
 import signal
 import threading
@@ -60,6 +61,7 @@ def nuclei_scan_wrapper(
     severity: Optional[str] = None,
     output_format: str = "json",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Wrapper for running a Nuclei security scan.
     
@@ -68,9 +70,10 @@ def nuclei_scan_wrapper(
         templates: List of specific template names to use (optional)
         severity: Filter by severity level (critical, high, medium, low, info)
         output_format: Output format (json, text)
-        options: Additional Nuclei options (e.g., ["-vv", "-rl", "100"])
+        options: Additional Nuclei options
+        rate_limit: Maximum requests per second (optional)
     """
-    return run_nuclei(target, templates, severity, output_format, options)
+    return run_nuclei(target, templates, severity, output_format, options, rate_limit)
 
 
 @mcp.tool()
@@ -99,10 +102,11 @@ def fetch_nuclei_finding_detail(finding_id: int) -> str:
 
 
 @mcp.tool()
-def fetch_stored_results(tool_name: str) -> str:
+def grep_stored_results(tool_name: str, pattern: str, context_lines: int = 2) -> str:
     """
-    Fetch the full results of a previously run tool (subfinder, amass, gospider, dirsearch).
-    Results are returned in full, so use with caution if you expect massive output.
+    Search through a tool's stored results using a regex pattern.
+    Returns matching lines plus context (default 2 lines) to avoid context window pollution.
+    Matches are limited to 15,000 characters to prevent saturation.
     """
     try:
         mapping = {
@@ -115,24 +119,55 @@ def fetch_stored_results(tool_name: str) -> str:
             "ffuf": "/tmp/secops_results/ffuf_latest.json",
             "wfuzz": "/tmp/secops_results/wfuzz_latest.json",
             "xsstrike": "/tmp/secops_results/xsstrike_latest.log",
-            "nmap": "/tmp/secops_results/nmap_raw.xml"
+            "nmap": "/tmp/secops_results/nmap_raw.xml",
+            "curl": "/tmp/secops_results/curl_latest.txt",
+            "nuclei": "/tmp/secops_results/nuclei_full.json"
         }
         
-        if tool_name not in mapping:
-            return json.dumps({"success": False, "error": f"Unknown tool or no storage configured for {tool_name}"})
+        # Lenient matching
+        tool_name_clean = tool_name.lower().strip()
+        matched_tool = None
         
-        path = mapping[tool_name]
+        # 1. Try exact match
+        if tool_name_clean in mapping:
+            matched_tool = tool_name_clean
+        else:
+            # 2. Try partial match (is current tool name in the key, or vice versa?)
+            for k in mapping:
+                if k in tool_name_clean or tool_name_clean in k:
+                    matched_tool = k
+                    break
+        
+        if not matched_tool:
+            return json.dumps({
+                "success": False, 
+                "error": f"Unknown tool '{tool_name}'. Supported tools: {', '.join(mapping.keys())}"
+            })
+        
+        path = mapping[matched_tool]
+        tool_name = matched_tool  # Use normalized name for consistency
+        
         if not os.path.exists(path):
             return json.dumps({"success": False, "error": f"No stored results found for {tool_name}. Run the scan first."})
         
-        if path.endswith(".json"):
-            with open(path, "r") as f:
-                data = json.load(f)
-            return json.dumps({"success": True, "results": data}, indent=2)
-        else:
-            with open(path, "r") as f:
-                data = f.read()
-            return json.dumps({"success": True, "output": data})
+        # Run grep on the server side
+        cmd = ["grep", "-i", "-E", "-C", str(context_lines), pattern, path]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        
+        output = res.stdout if res.stdout else "No matches found."
+        is_truncated = False
+        
+        if len(output) > 15000:
+            output = output[:15000] + "\n\n... [MATCHES TRUNCATED: Result too large. Refine your regex pattern.] ..."
+            is_truncated = True
+            
+        return json.dumps({
+            "success": True, 
+            "matches": output,
+            "tool": tool_name,
+            "pattern": pattern,
+            "is_truncated": is_truncated
+        })
             
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
@@ -144,6 +179,7 @@ def ffuf_wrapper(
     wordlist: str,
     filter_code: Optional[str] = "404",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Wrapper for running ffuf fuzzing.
     
@@ -151,9 +187,10 @@ def ffuf_wrapper(
         url: Target URL with FUZZ keyword
         wordlist: Path to wordlist file
         filter_code: HTTP code to filter
-        options: Additional ffuf options (e.g., ["-recursion"])
+        options: Additional ffuf options
+        rate_limit: Maximum requests per second (optional)
     """
-    return run_ffuf(url, wordlist, filter_code, options)
+    return run_ffuf(url, wordlist, filter_code, options, rate_limit)
 
 
 @mcp.tool()
@@ -162,6 +199,7 @@ def wfuzz_wrapper(
     wordlist: str,
     hide_code: Optional[str] = "404",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Wrapper for running wfuzz fuzzing.
     
@@ -170,8 +208,9 @@ def wfuzz_wrapper(
         wordlist: Path to wordlist file
         hide_code: HTTP code to hide
         options: Additional wfuzz options
+        rate_limit: Maximum requests per second (optional)
     """
-    result = run_wfuzz(url, wordlist, hide_code, options)
+    result = run_wfuzz(url, wordlist, hide_code, options, rate_limit)
     try:
         if result:
             data = json.loads(result)
@@ -186,9 +225,16 @@ def wfuzz_wrapper(
 def sqlmap_wrapper(
     url: str,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running SQLMap scan."""
-    return run_sqlmap(url, options)
+    """Wrapper for running SQLMap scan.
+    
+    Args:
+        url: Target URL to scan (must include parameter)
+        options: Additional sqlmap options
+        rate_limit: Maximum requests per second (optional)
+    """
+    return run_sqlmap(url, options, rate_limit)
 
 
 @mcp.tool()
@@ -196,9 +242,17 @@ def nmap_wrapper(
     target: str,
     ports: Optional[str] = None,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running Nmap scan."""
-    return run_nmap(target, ports, options)
+    """Wrapper for running Nmap scan.
+    
+    Args:
+        target: Target IP or hostname
+        ports: Ports to scan
+        options: Additional nmap options
+        rate_limit: Maximum requests per second (optional)
+    """
+    return run_nmap(target, ports, options, rate_limit)
 
 
 @mcp.tool()
@@ -216,9 +270,16 @@ def hashcat_wrapper(
 def httpx_wrapper(
     urls: List[str],
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running HTTPX scan."""
-    result = run_httpx(urls, options)
+    """Wrapper for running HTTPX scan.
+    
+    Args:
+        urls: List of targets
+        options: Additional httpx options
+        rate_limit: Maximum requests per second (optional)
+    """
+    result = run_httpx(urls, options, rate_limit=rate_limit)
     try:
         # httpx may output multiple JSON objects per line
         lines = result.splitlines()
@@ -238,9 +299,17 @@ def subfinder_wrapper(
     domain: str,
     output_format: Optional[str] = "json",
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running Subfinder subdomain enumeration."""
-    result = run_subfinder(domain, output_format, options)
+    """Wrapper for running Subfinder subdomain enumeration.
+    
+    Args:
+        domain: Target domain
+        output_format: json or text
+        options: Additional subfinder options
+        rate_limit: Maximum requests per second (optional)
+    """
+    result = run_subfinder(domain, output_format, options, rate_limit)
     try:
         # result is already a JSON string from run_subfinder
         parsed = json.loads(result)
@@ -254,18 +323,33 @@ def tlsx_wrapper(
     host: str,
     port: Optional[int] = 443,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running TLSX scan."""
-    return run_tlsx(host, port, options)
+    """Wrapper for running TLSX scan.
+    
+    Args:
+        host: Target host
+        port: Target port
+        options: Additional tlsx options
+        rate_limit: Maximum requests per second (optional)
+    """
+    return run_tlsx(host, port, options, rate_limit)
 
 
 @mcp.tool()
 def xsstrike_wrapper(
     url: str,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running XSStrike scan."""
-    return run_xsstrike(url, options)
+    """Wrapper for running XSStrike scan.
+    
+    Args:
+        url: Target URL
+        options: Additional xsstrike options
+        rate_limit: Maximum requests per second (optional)
+    """
+    return run_xsstrike(url, options, rate_limit)
 
 
 @mcp.tool()
@@ -281,9 +365,17 @@ def amass_scan(
     domain: str,
     passive: bool = True,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running Amass subdomain enumeration."""
-    result = amass_tool(domain, passive, options)
+    """Wrapper for running Amass subdomain enumeration.
+    
+    Args:
+        domain: Target domain
+        passive: Whether to use passive scan
+        options: Additional amass options
+        rate_limit: Maximum requests per second (optional)
+    """
+    result = amass_tool(domain, passive, options, rate_limit)
     return json.dumps(result, indent=2)
 
 
@@ -293,9 +385,18 @@ def dirsearch_wrapper(
     extensions: Optional[List[str]] = None,
     wordlist: Optional[str] = None,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
-    """Wrapper for running Dirsearch directory brute forcing."""
-    result = dirsearch_tool(url, extensions, wordlist, options)
+    """Wrapper for running Dirsearch directory brute forcing.
+    
+    Args:
+        url: Target URL
+        extensions: Extensions to check
+        wordlist: Wordlist path
+        options: Additional dirsearch options
+        rate_limit: Maximum requests per second (optional)
+    """
+    result = dirsearch_tool(url, extensions, wordlist, options, rate_limit)
     return json.dumps(result, indent=2)
 
 
@@ -310,9 +411,18 @@ def gospider_scan(
     include_subs: bool = False,
     include_other_source: bool = False,
     output_format: str = "json",
-    options: Optional[List[str]] = None
+    options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None
 ) -> str:
-    """Wrapper for running Gospider web crawling."""
+    """Wrapper for running Gospider web crawling.
+    
+    Args:
+        target: Target URL
+        depth: Crawl depth
+        concurrent: Number of concurrent requests
+        timeout: Request timeout
+        rate_limit: Maximum requests per second (optional)
+    """
     result = gospider_wrapper(
         target=target,
         depth=depth,
@@ -323,7 +433,8 @@ def gospider_scan(
         include_subs=include_subs,
         include_other_source=include_other_source,
         output_format=output_format,
-        options=options
+        options=options,
+        rate_limit=rate_limit
     )
     return json.dumps(result, indent=2)
 
@@ -337,9 +448,15 @@ def gospider_filtered_scan(
     depth: int = 3,
     concurrent: int = 10,
     timeout: int = 10,
-    include_subs: bool = False
+    include_subs: bool = False,
+    rate_limit: Optional[int] = None
 ) -> str:
-    """Wrapper for running Gospider web crawling with filtering capabilities."""
+    """Wrapper for running Gospider web crawling with filtering capabilities.
+    
+    Args:
+        target: Target URL
+        rate_limit: Maximum requests per second (optional)
+    """
     result = gospider_crawl_with_filter(
         target=target,
         extensions=extensions,
@@ -348,7 +465,8 @@ def gospider_filtered_scan(
         depth=depth,
         concurrent=concurrent,
         timeout=timeout,
-        include_subs=include_subs
+        include_subs=include_subs,
+        rate_limit=rate_limit
     )
     return json.dumps(result, indent=2)
 
@@ -365,9 +483,25 @@ def arjun_scan(
     threads: int = 25,
     stable: bool = False,
     output_format: str = "json",
-    options: Optional[List[str]] = None
+    options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None
 ) -> str:
-    """Wrapper for running Arjun HTTP parameter discovery."""
+    """Wrapper for running Arjun HTTP parameter discovery.
+    
+    Args:
+        url: Target URL
+        method: HTTP method
+        wordlist: Wordlist path
+        headers: Headers list
+        data: POST data
+        delay: Delay between requests
+        timeout: Request timeout
+        threads: Number of threads
+        stable: Use stable mode
+        output_format: json or text
+        options: Additional arjun options
+        rate_limit: Maximum requests per second (optional)
+    """
     result = arjun_wrapper(
         url=url,
         method=method,
@@ -379,7 +513,8 @@ def arjun_scan(
         threads=threads,
         stable=stable,
         output_format=output_format,
-        options=options
+        options=options,
+        rate_limit=rate_limit
     )
     return json.dumps(result, indent=2)
 
@@ -390,15 +525,22 @@ def arjun_bulk_parameter_scan(
     method: str = "GET",
     wordlist: Optional[str] = None,
     threads: int = 25,
-    stable: bool = False
+    stable: bool = False,
+    rate_limit: Optional[int] = None
 ) -> str:
-    """Wrapper for running Arjun parameter discovery on multiple URLs."""
+    """Wrapper for running Arjun parameter discovery on multiple URLs.
+    
+    Args:
+        urls: List of target URLs
+        rate_limit: Maximum requests per second (optional)
+    """
     result = arjun_bulk_scan(
         urls=urls,
         method=method,
         wordlist=wordlist,
         threads=threads,
-        stable=stable
+        stable=stable,
+        rate_limit=rate_limit
     )
     return json.dumps(result, indent=2)
 
@@ -411,9 +553,15 @@ def arjun_custom_parameter_scan(
     wordlist: Optional[str] = None,
     timeout: int = 10,
     threads: int = 25,
-    stable: bool = False
+    stable: bool = False,
+    rate_limit: Optional[int] = None
 ) -> str:
-    """Wrapper for running Arjun with custom parameter testing."""
+    """Wrapper for running Arjun with custom parameter testing.
+    
+    Args:
+        url: Target URL
+        rate_limit: Maximum requests per second (optional)
+    """
     result = arjun_with_custom_payloads(
         url=url,
         method=method,
@@ -421,7 +569,8 @@ def arjun_custom_parameter_scan(
         wordlist=wordlist,
         timeout=timeout,
         threads=threads,
-        stable=stable
+        stable=stable,
+        rate_limit=rate_limit
     )
     return json.dumps(result, indent=2)
 
@@ -430,14 +579,16 @@ def arjun_custom_parameter_scan(
 def curl_tool(
     url: str,
     options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None,
 ) -> str:
     """Wrapper for running curl commands to transfer data.
     
     Args:
         url: The URL to interact with
-        options: Additional curl options (e.g., ["-X", "POST", "-d", "data"])
+        options: Additional curl options
+        rate_limit: Maximum requests per second (optional)
     """
-    return run_curl(url, options)
+    return run_curl(url, options, rate_limit)
 
 
 if __name__ == "__main__":

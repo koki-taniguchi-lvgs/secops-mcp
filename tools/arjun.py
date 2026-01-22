@@ -13,7 +13,8 @@ def arjun_wrapper(
     threads: int = 25,
     stable: bool = False,
     output_format: str = "json",
-    options: Optional[List[str]] = None
+    options: Optional[List[str]] = None,
+    rate_limit: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Wrapper for Arjun HTTP parameter discovery tool.
@@ -30,6 +31,7 @@ def arjun_wrapper(
         stable (bool): Use stable mode for fewer false positives
         output_format (str): Output format (json, txt)
         options (List[str]): Additional Arjun options (e.g., ["--passive", "--include"])
+        rate_limit: Maximum requests per second (optional)
     
     Returns:
         Dict[str, Any]: Results containing discovered parameters
@@ -52,7 +54,9 @@ def arjun_wrapper(
         if data:
             cmd.extend(["-d", data])
             
-        if delay > 0:
+        if rate_limit:
+            cmd.extend(["--ratelimit", str(rate_limit)])
+        elif delay > 0:
             cmd.extend(["--delay", str(delay)])
             
         cmd.extend(["-T", str(timeout)])
@@ -130,7 +134,8 @@ def arjun_bulk_scan(
     method: str = "GET",
     wordlist: Optional[str] = None,
     threads: int = 25,
-    stable: bool = False
+    stable: bool = False,
+    rate_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Enhanced Arjun wrapper for scanning multiple URLs.
@@ -141,6 +146,7 @@ def arjun_bulk_scan(
         wordlist (str): Custom wordlist file path
         threads (int): Number of threads to use
         stable (bool): Use stable mode
+        rate_limit (int): Maximum requests per second (optional)
         
     Returns:
         Dict[str, Any]: Aggregated results from all scanned URLs
@@ -155,7 +161,8 @@ def arjun_bulk_scan(
             method=method,
             wordlist=wordlist,
             threads=threads,
-            stable=stable
+            stable=stable,
+            rate_limit=rate_limit
         )
         
         if result["success"]:
